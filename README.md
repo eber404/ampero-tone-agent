@@ -1,6 +1,6 @@
-# codex4ampero
+# ampero-tone-agent
 
-`codex4ampero` is a Codex-native tone agent and safety-focused local control layer for the **HOTONE Ampero II Stomp**.
+`ampero-tone-agent` is an AI-native tone agent and safety-focused local control layer for the **HOTONE Ampero II Stomp**.
 
 You can ask Codex to:
 
@@ -32,7 +32,7 @@ Codex interprets the goal, researches the tone background of a song or artist, q
 
 ## Features
 
-### Codex-native conversation workflow
+### AI-native conversation workflow
 
 - Uses the `$ampero-tone` Skill as the user entry point instead of implementing another chat website or desktop chat UI.
 - Collects guitar, pickup, and output-device information in sequence so parameters are not guessed when important context is missing.
@@ -160,8 +160,8 @@ The recommended setup is to clone the repository and let Codex perform the insta
 Replace `YOUR_USERNAME` with the actual GitHub username or repository owner:
 
 ```powershell
-git clone https://github.com/YOUR_USERNAME/codex4ampero.git
-cd codex4ampero
+git clone https://github.com/YOUR_USERNAME/ampero-tone-agent.git
+cd ampero-tone-agent
 ```
 
 ### 2. Create a Python virtual environment
@@ -184,7 +184,7 @@ python -m pip install -e .
 
 The installation provides two equivalent commands:
 
-- `codex4ampero` - recommended command name.
+- `ampero-tone-agent` - recommended command name.
 - `ampero-control` - backward-compatible alias retained for earlier versions.
 
 ### 3. Configure the official editor location
@@ -211,11 +211,11 @@ export AMPERO_EDITOR_DIR="/Applications/Ampero II.app"
 You can also pass the location for one command:
 
 ```powershell
-codex4ampero --editor-dir "C:\Path\To\Ampero II" --json doctor --scan
+ampero-tone-agent --editor-dir "C:\Path\To\Ampero II" --json doctor --scan
 ```
 
 ```bash
-codex4ampero --editor-dir "/Applications/Ampero II.app" --json doctor --scan
+ampero-tone-agent --editor-dir "/Applications/Ampero II.app" --json doctor --scan
 ```
 
 ### 4. Build the Dart bridge
@@ -247,7 +247,7 @@ The macOS output is `.tools/ampero_bridge`.
 Connect the device over USB and fully close the official Ampero II editor:
 
 ```powershell
-codex4ampero --json doctor --scan
+ampero-tone-agent --json doctor --scan
 ```
 
 A healthy result should include:
@@ -476,7 +476,7 @@ Fully exit the official Ampero II editor, including orphaned background processe
 
 ```powershell
 $env:AMPERO_EDITOR_DIR = "C:\Path\To\Ampero II"
-codex4ampero --json doctor --scan
+ampero-tone-agent --json doctor --scan
 ```
 
 Check that the installation directory contains:
@@ -520,10 +520,10 @@ Reinstall the Skill:
 Or set the repository path manually:
 
 ```powershell
-$env:CODEX4AMPERO_ROOT = "C:\Path\To\codex4ampero"
+$env:AMPERO_TONE_AGENT_ROOT = "C:\Path\To\ampero-tone-agent"
 ```
 
-The legacy `VIBE_AMPERO_ROOT` variable is still read for compatibility, but new installations set only `CODEX4AMPERO_ROOT`.
+The legacy `VIBE_AMPERO_ROOT` and `CODEX4AMPERO_ROOT` variables are still read for compatibility, but new installations set only `AMPERO_TONE_AGENT_ROOT`.
 
 ### `DeviceTimeoutError` or `WatchdogTimeout`
 
@@ -553,7 +553,7 @@ This means the protocol cannot confirm the current patch location, so writes are
 ### Repository structure
 
 ```text
-codex4ampero/
+ampero-tone-agent/
 ├── bridge/                      Dart FFI / NativePort bridge
 ├── docs/                        Architecture, protocol, safety, and development docs
 ├── examples/                    Schema v1 tone plans
@@ -612,17 +612,17 @@ The `.github/workflows/tests.yml` workflow runs the complete unit test suite on 
 
 ## Publishing to GitHub
 
-Create an empty GitHub repository named `codex4ampero`, then run:
+Create an empty GitHub repository named `ampero-tone-agent`, then run:
 
 ```powershell
-git remote add origin https://github.com/YOUR_USERNAME/codex4ampero.git
+git remote add origin https://github.com/YOUR_USERNAME/ampero-tone-agent.git
 git push -u origin main
 ```
 
 If `origin` already exists:
 
 ```powershell
-git remote set-url origin https://github.com/YOUR_USERNAME/codex4ampero.git
+git remote set-url origin https://github.com/YOUR_USERNAME/ampero-tone-agent.git
 git push -u origin main
 ```
 

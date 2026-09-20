@@ -36,6 +36,6 @@ fi
 
 mkdir -p "$destination_root"
 cp -R "$source_dir" "$destination"
-printf '%s\n' "$project_root" > "$destination/.codex4ampero-root"
+printf '%s\n' "$project_root" > "$destination/.ampero-tone-agent-root"
 printf 'Installed ampero-tone skill to %s\n' "$destination"
 printf '%s\n' "Restart Codex before using the skill."

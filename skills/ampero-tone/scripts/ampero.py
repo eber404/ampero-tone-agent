@@ -7,23 +7,27 @@ from pathlib import Path
 
 
 def _project_root() -> Path:
-    configured = os.environ.get("CODEX4AMPERO_ROOT") or os.environ.get(
-        "VIBE_AMPERO_ROOT"
+    configured = (
+        os.environ.get("AMPERO_TONE_AGENT_ROOT")
+        or os.environ.get("CODEX4AMPERO_ROOT")
+        or os.environ.get("VIBE_AMPERO_ROOT")
     )
     if configured:
         return Path(configured)
-    marker = Path(__file__).resolve().parents[1] / ".codex4ampero-root"
-    if marker.is_file():
-        marked_root = marker.read_text(encoding="utf-8").strip()
-        if marked_root:
-            return Path(marked_root)
+    skill_root = Path(__file__).resolve().parents[1]
+    for marker in (".ampero-tone-agent-root", ".codex4ampero-root"):
+        marker_path = skill_root / marker
+        if marker_path.is_file():
+            marked_root = marker_path.read_text(encoding="utf-8").strip()
+            if marked_root:
+                return Path(marked_root)
     local_root = Path(__file__).resolve().parents[3]
     if (local_root / "src" / "ampero_control").is_dir():
         return local_root
     raise RuntimeError(
-        "codex4ampero repository was not found. Re-run "
+        "ampero-tone-agent repository was not found. Re-run "
         "scripts/windows/install-skill.ps1 or scripts/macos/install-skill.sh "
-        "or set CODEX4AMPERO_ROOT to the cloned repository path."
+        "or set AMPERO_TONE_AGENT_ROOT to the cloned repository path."
     )
 
 

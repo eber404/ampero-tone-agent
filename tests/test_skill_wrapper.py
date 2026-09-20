@@ -47,7 +47,8 @@ class SkillWrapperTests(unittest.TestCase):
             with patch.dict(
                 os.environ,
                 {
-                    "CODEX4AMPERO_ROOT": directory,
+                    "AMPERO_TONE_AGENT_ROOT": directory,
+                    "CODEX4AMPERO_ROOT": "legacy-path",
                     "VIBE_AMPERO_ROOT": "legacy-path",
                 },
             ):
@@ -58,7 +59,7 @@ class SkillWrapperTests(unittest.TestCase):
             temporary = Path(directory)
             script = temporary / "skills" / "ampero-tone" / "scripts" / "ampero.py"
             script.parent.mkdir(parents=True)
-            marker = script.parents[1] / ".codex4ampero-root"
+            marker = script.parents[1] / ".ampero-tone-agent-root"
             project_root = temporary / "repository"
             marker.write_text(str(project_root), encoding="utf-8")
 

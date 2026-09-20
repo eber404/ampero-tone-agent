@@ -9,7 +9,7 @@ from ampero_control.plan import TonePlan
 
 class CliTests(unittest.TestCase):
     def test_public_cli_uses_project_name(self):
-        self.assertEqual(build_parser().prog, "codex4ampero")
+        self.assertEqual(build_parser().prog, "ampero-tone-agent")
 
     def test_apply_response_includes_journal_bound_save_preview(self):
         plan = TonePlan.from_dict(

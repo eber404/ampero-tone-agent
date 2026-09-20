@@ -2,7 +2,7 @@
 
 ## Project
 
-`codex4ampero` is a Codex-native tone agent and local control layer for the
+`ampero-tone-agent` is an AI-native tone agent and local control layer for the
 HOTONE Ampero II Stomp.
 
 The project helps users research tones, inspect device state, prepare tone

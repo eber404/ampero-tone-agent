@@ -1,5 +1,5 @@
-name: codex4ampero_bridge
-description: Minimal Dart FFI bridge used internally by codex4ampero.
+name: ampero_tone_agent_bridge
+description: Minimal Dart FFI bridge used internally by ampero-tone-agent.
 version: 0.2.0
 publish_to: none
 

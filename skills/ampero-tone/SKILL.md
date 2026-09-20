@@ -1,6 +1,6 @@
 ---
 name: ampero-tone
-description: Control and iteratively tune a locally connected HOTONE Ampero II Stomp from Codex. Use when the user asks to inspect, research, design, preview, apply, compare, refine, save, or roll back guitar tone/effect-chain changes on Ampero II hardware, including natural-language requests such as warmer, clearer, less harsh, more ambient, or similar to a song or artist. This skill uses the local codex4ampero Python control layer and the official editor's installed algorithm catalog and native communication library.
+description: Control and iteratively tune a locally connected HOTONE Ampero II Stomp from an AI coding agent. Use when the user asks to inspect, research, design, preview, apply, compare, refine, save, or roll back guitar tone/effect-chain changes on Ampero II hardware, including natural-language requests such as warmer, clearer, less harsh, more ambient, or similar to a song or artist. This skill uses the local ampero-tone-agent Python control layer and the official editor's installed algorithm catalog and native communication library.
 ---
 
 # Ampero Tone

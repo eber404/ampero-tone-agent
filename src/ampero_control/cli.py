@@ -19,7 +19,7 @@ from .preset_save import prepare_preset_save
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="codex4ampero",
+        prog="ampero-tone-agent",
         description="Safe local control layer for HOTONE Ampero II Stomp",
     )
     parser.add_argument("--version", action="version", version=__version__)

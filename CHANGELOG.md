@@ -22,5 +22,5 @@ All notable project changes are documented in this file.
 
 ## 0.1.0
 
-- Added the initial Codex-native Ampero II control layer, algorithm catalog reader,
+- Added the initial AI-native Ampero II control layer, algorithm catalog reader,
   Dart NativePort bridge, plan validation, safety checks, and Skill packaging.
