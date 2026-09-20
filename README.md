@@ -1,177 +1,167 @@
 # codex4ampero
 
-**中文** | [English](#english)
+`codex4ampero` is a Codex-native tone agent and safety-focused local control layer for the **HOTONE Ampero II Stomp**.
 
-`codex4ampero` 是一个面向 **HOTONE Ampero II Stomp** 的 Codex 原生音色 Agent 与安全本地控制层。
+You can ask Codex to:
 
-你可以直接告诉 Codex：
+- Make a tone warmer and less harsh.
+- Research a song's solo tone online and show a proposal without writing to the device.
+- Write an approved tone to `A50-1` and generate a save preview.
+- Roll back an unwanted change.
 
-- “把这个音色调得更温暖、少一点刺耳感。”
-- “联网调研某首歌的 Solo 音色，先给方案，不要直接写设备。”
-- “将确认后的音色自动写入 A50-1，并生成保存预览。”
-- “回滚刚才不满意的修改。”
-
-Codex 负责理解目标、调研歌曲或艺人的音色背景、查询官方编辑器随附的真实算法目录、生成可审阅计划，并在经过明确确认后调用确定性的本地控制层。底层不会让语言模型直接构造任意设备消息。
+Codex interprets the goal, researches the tone background of a song or artist, queries the real algorithm catalog shipped with the official editor, generates a reviewable plan, and calls a deterministic local control layer only after explicit confirmation. The control layer never lets the language model construct arbitrary device messages directly.
 
 > [!IMPORTANT]
-> 本项目是独立的兼容性研究项目，不是 HOTONE 或 OpenAI 的官方产品。项目不会分发 HOTONE 编辑器、`HTUSBTools.dll`、官方算法目录、固件或预编译的厂商组件。
+> This is an independent compatibility-research project. It is not an official HOTONE or OpenAI product. The repository does not distribute the HOTONE editor, `HTUSBTools.dll`, the official algorithm catalog, firmware, or prebuilt vendor components.
 
-## 目录
+## Contents
 
-- [核心功能](#核心功能)
-- [项目状态与兼容性](#项目状态与兼容性)
-- [工作原理](#工作原理)
-- [环境要求](#环境要求)
-- [安装](#安装)
-- [使用 Codex Skill](#使用-codex-skill)
-- [命令行使用](#命令行使用)
-- [音色计划与保存流程](#音色计划与保存流程)
-- [安全边界](#安全边界)
-- [故障排查](#故障排查)
-- [开发与测试](#开发与测试)
-- [发布到 GitHub](#发布到-github)
-- [许可证与商标](#许可证与商标)
+- [Features](#features)
+- [Compatibility](#compatibility)
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Codex Usage](#codex-usage)
+- [CLI Usage](#cli-usage)
+- [Tone Plans and Save Workflow](#tone-plans-and-save-workflow)
+- [Safety Boundary](#safety-boundary)
+- [Troubleshooting](#troubleshooting)
+- [Development and Testing](#development-and-testing)
+- [Publishing to GitHub](#publishing-to-github)
+- [License and Trademarks](#license-and-trademarks)
 
-## 核心功能
+## Features
 
-### Codex 原生对话工作流
+### Codex-native conversation workflow
 
-- 使用 `$ampero-tone` Skill 作为用户入口，不重复实现另一套聊天网页或桌面聊天界面。
-- 依次收集吉他/拾音器与输出设备信息，避免在关键上下文未知时猜参数。
-- 对指定歌曲、艺人、专辑或录音年代执行结构化联网调研。
-- 区分来源事实、算法目录事实、音色工程推断、局限和置信度。
-- 先给完整效果链与参数方案，再询问意见、目标位置和最终写入确认。
-- 写入成功后可直接返回 journal 绑定的保存预览，减少一次冗余交互。
+- Uses the `$ampero-tone` Skill as the user entry point instead of implementing another chat website or desktop chat UI.
+- Collects guitar, pickup, and output-device information in sequence so parameters are not guessed when important context is missing.
+- Performs structured web research for a specified song, artist, album, or recording era.
+- Separates sourced facts, algorithm-catalog facts, tone-engineering inferences, limitations, and confidence.
+- Shows a complete effect chain and parameter proposal before asking for tone feedback, destination approval, and final write confirmation.
+- Returns a journal-bound save preview immediately after a successful write, avoiding a redundant interaction.
 
-### 官方算法目录映射
+### Official algorithm catalog mapping
 
-- 自动寻找本机官方 Ampero II Editor 的算法 JSON 目录。
-- 使用真实模型名、分类、模型码、参数名、参数 ID、范围、步进和枚举值。
-- 禁止模型凭空编造算法名或协议 ID。
-- 支持本地目录搜索与精确模型详情查询。
+- Automatically discovers the official Ampero II Editor algorithm JSON directory on the local machine.
+- Uses real model names, categories, model codes, parameter names, parameter IDs, ranges, steps, and enum values.
+- Prevents the model from inventing algorithm names or protocol IDs.
+- Supports local catalog search and exact model-detail queries.
 
-### 设备只读能力
+### Read-only device capabilities
 
-- 枚举 Ampero II Stomp 的输入和输出端口。
-- 读取当前 Scene。
-- 读取完整当前预设，包括名称、Scene、槽位顺序、启用状态、模型和参数。
-- 读取当前路由模板，并识别 `Parallel`、`Split->Mix`、`A/B->Y`、`Y->A/B` 和 `Serial`。
-- 读取并验证 `Axx-y` 位置；例如 `A50-1` 对应线性索引 `150`。
+- Enumerates Ampero II Stomp input and output ports.
+- Reads the current Scene.
+- Reads the complete current preset, including name, Scene, slot order, enabled state, models, and parameters.
+- Reads the current routing template and identifies `Parallel`, `Split->Mix`, `A/B->Y`, `Y->A/B`, and `Serial`.
+- Reads and verifies `Axx-y` locations. For example, `A50-1` maps to linear index `150`.
 
-### 受控写入能力
+### Controlled write capabilities
 
-- 修改槽位模型和开关状态。
-- 修改模型参数。
-- 切换 Scene。
-- 切换官方路由模板。
-- 自动选择目标预设并要求设备回读目标索引。
-- 每条命令写入后立即读取并验证。
-- 将写前状态记录到 journal；中途失败时按相反顺序回滚已执行操作。
+- Changes slot models and enabled state.
+- Changes model parameters.
+- Switches Scenes.
+- Switches official routing templates.
+- Selects the target preset automatically and requires the device to read back the target index.
+- Reads back and verifies every command immediately after writing.
+- Records pre-write state in a journal and rolls back completed operations in reverse order if an operation fails midway.
 
-### 独立预设保存
+### Independent preset saving
 
-- 普通 `plan apply` 只修改设备的实时编辑缓冲区，不自动保存。
-- 保存只能绑定到一个状态为 `applied`、且所有命令回读成功的 journal。
-- 保存前再次验证设备当前处于 journal 的精确目标位置。
-- 使用目标特定口令，例如 `SAVE:A50-1`。
-- `save_preview_name` 可让 tone preview 提前显示保存目标、名称、21 字节 payload 和不可回滚警告。
-- Apply 成功后 CLI 自动返回已绑定 journal 的精确保存预览，用户可直接确认或拒绝保存。
+- Normal `plan apply` changes only the device's live editing buffer; it does not save automatically.
+- Saving can only bind to a journal whose status is `applied` and whose commands all passed readback verification.
+- The controller verifies again before saving that the device is at the journal's exact target location.
+- Saving uses a target-specific confirmation token such as `SAVE:A50-1`.
+- `save_preview_name` lets the tone preview show the save target, name, 21-byte payload, and irreversible-save warning in advance.
+- After a successful apply, the CLI returns the exact journal-bound save preview so the user can confirm or reject saving directly.
 
-### 防卡死设计
+### Hang prevention
 
-- 厂商 DLL 与 Dart bridge 在独立工作进程中运行。
-- Skill wrapper 为扫描、快照、应用、回滚和保存提供外层硬超时。
-- 超时后终止子进程并返回结构化 `WatchdogTimeout`，不会无限等待命令。
+- The vendor DLL and Dart bridge run in an isolated worker process.
+- The Skill wrapper applies hard outer timeouts to scanning, snapshots, apply, rollback, and save operations.
+- On timeout, the child process is terminated and a structured `WatchdogTimeout` is returned instead of waiting indefinitely.
 
-## 项目状态与兼容性
+## Compatibility
 
-当前版本：**0.2.0（Alpha）**
+Current release: **0.2.0 (Alpha)**
 
-| 项目 | 状态 |
+| Item | Status |
 | --- | --- |
-| 操作系统 | Windows x64 |
-| 已验证设备 | HOTONE Ampero II Stomp |
-| Python | 3.9+，必须为 x64 |
-| 官方编辑器 | 必须在本机安装；直连设备时必须关闭 |
-| 算法目录 | 从本机编辑器动态读取；测试目录版本为 `v1.0.8` |
-| 只读快照 | 已在真实设备验证 |
-| 路由读取/Serial 切换 | 已在真实设备验证 |
-| 模型与参数写入 | 已在真实设备验证 |
-| 单条即时回读 | 已在真实设备验证 |
-| 自动目标选择 | 已实现并验证 |
-| Journal 与回滚数据 | 已实现并验证 |
-| 预设保存 | 已实现；部分固件可能在实际保存后丢失正式回执 |
-| Ampero II / Ampero II Stage | 尚未验证，不应假设协议完全相同 |
+| Operating system | Windows x64 |
+| Verified hardware | HOTONE Ampero II Stomp |
+| Python | 3.9+; must be x64 |
+| Official editor | Required locally; must be closed during direct device access |
+| Algorithm catalog | Read dynamically from the local editor; test catalog version is `v1.0.8` |
+| Read-only snapshots | Verified on real hardware |
+| Routing reads and Serial switching | Verified on real hardware |
+| Model and parameter writes | Verified on real hardware |
+| Per-command immediate readbacks | Verified on real hardware |
+| Automatic target selection | Implemented and verified |
+| Journal and rollback data | Implemented and verified |
+| Preset save | Implemented; some firmware may drop the official response after saving |
+| Ampero II / Ampero II Stage | Not verified; do not assume protocol equivalence |
 
-2026 年 7 月 18 日的真实设备测试中，一个 21 条命令的 `A50-1` 音色计划全部获得即时回读验证。预设保存 payload 也曾实际生效，但测试固件有时在保存后不再返回正式回执；遇到这种情况，控制层会保守地报告“未验证”，而不是错误宣称保存成功。
+On July 18, 2026, a real `A50-1` tone plan containing 21 commands completed with 21 immediate readback verifications. The preset-save payload has also been observed to persist on hardware, but the tested firmware can stop returning an official response after saving. In that ambiguous case, the controller conservatively reports the save as unverified instead of falsely claiming success.
 
-## 工作原理
+## Architecture
 
 ```text
 Codex conversation
        |
        v
 ampero-tone Skill
-上下文收集、联网调研、方案审批、目标审批和安全确认
+context collection, web research, proposal approval, destination approval, safety confirmation
        |
        v
 Python package: ampero_control
-目录解析、计划校验、安全限制、预览、journal、回滚和保存准备
+catalog resolution, plan validation, safety limits, previews, journals, rollback, save preparation
        |
        v
 Dart NativePort bridge
-厂商 DLL 连接、timer pump、请求/响应和消息发送
+vendor DLL connection, timer pump, request/response transport, message sending
        |
        v
 HOTONE Ampero II Stomp
 ```
 
-为什么需要 Dart bridge：官方 Flutter 编辑器使用 Dart DL API 和真实的 `ReceivePort.nativePort` 接收连接后的消息。普通 Python `ctypes` 可以安全完成 DLL 加载和端口扫描，但不能稳定替代这个回调模型，因此所有已连接请求都通过受监督的 Dart 子进程执行。
+The Dart bridge is required because the official Flutter editor uses the Dart DL API and a real `ReceivePort.nativePort` to receive connected-device messages. Ordinary Python `ctypes` can safely load the DLL and scan ports, but it cannot reliably replace this callback model. All connected requests therefore run through a supervised Dart child process.
 
-详细说明：
+See [Architecture](docs/architecture.md), [Protocol notes](docs/protocol.md), [Safety](docs/safety.md), [Development](docs/development.md), and the [Changelog](CHANGELOG.md).
 
-- [架构](docs/architecture.md)
-- [协议兼容性说明](docs/protocol.md)
-- [安全模型](docs/safety.md)
-- [开发说明](docs/development.md)
-- [变更记录](CHANGELOG.md)
+## Requirements
 
-## 环境要求
+1. **Windows x64.**
+2. **HOTONE Ampero II Stomp** connected over USB.
+3. **Official Ampero II Editor.** Install it from the [HOTONE support site](https://www.hotoneaudio.com/support). At runtime, this project reads the communication DLL and algorithm catalog from its installation directory.
+4. **Python 3.9+ x64.** Install it from the [Python Windows downloads](https://www.python.org/downloads/windows/).
+5. **Dart SDK 3.3+.** Required for the first local bridge build; see [Get Dart](https://dart.dev/get-dart).
+6. **Codex CLI.** Required for the conversational agent workflow; see the [official OpenAI Codex CLI documentation](https://developers.openai.com/codex/cli).
 
-### 必需
+### Install Codex CLI
 
-1. **Windows x64**。
-2. **HOTONE Ampero II Stomp**，通过 USB 连接。
-3. **官方 Ampero II Editor**。请从 [HOTONE 官方支持页面](https://www.hotoneaudio.com/support) 安装；本项目运行时从它的安装目录读取通信 DLL 和算法目录。
-4. **Python 3.9+ x64**。可从 [Python Windows 下载页面](https://www.python.org/downloads/windows/) 安装。
-5. **Dart SDK 3.3+**，用于第一次构建本地 bridge。可参考 [Dart 官方安装说明](https://dart.dev/get-dart)。
-6. **Codex CLI**，用于对话式 Agent 工作流。官方说明见 [OpenAI Codex CLI](https://developers.openai.com/codex/cli)。
-
-### Codex CLI 安装
-
-如果已经安装 Node.js/npm，可使用官方包：
+When Node.js/npm is available, install the official package:
 
 ```powershell
 npm install -g @openai/codex
 codex
 ```
 
-Codex 的登录和认证方式以 OpenAI 官方文档为准。
+Use the OpenAI documentation for Codex login and authentication details.
 
-## 安装
+## Installation
 
-**推荐食用方法：直接把仓库clone下来让codex自己装**
+The recommended setup is to clone the repository and let Codex perform the installation steps.
 
-### 1. 克隆仓库
+### 1. Clone the repository
 
-将下面的 `YOUR_USERNAME` 替换为实际 GitHub 用户名：
+Replace `YOUR_USERNAME` with the actual GitHub username or repository owner:
 
 ```powershell
 git clone https://github.com/YOUR_USERNAME/codex4ampero.git
 cd codex4ampero
 ```
 
-### 2. 创建 Python 虚拟环境
+### 2. Create a Python virtual environment
 
 ```powershell
 py -3.9 -m venv .venv
@@ -180,149 +170,149 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-安装后提供两个等价命令：
+The installation provides two equivalent commands:
 
-- `codex4ampero`：推荐的新命令名。
-- `ampero-control`：为早期版本保留的兼容别名。
+- `codex4ampero` - recommended command name.
+- `ampero-control` - backward-compatible alias retained for earlier versions.
 
-### 3. 配置官方编辑器位置
+### 3. Configure the official editor location
 
-程序会尝试以下位置：
+The application checks these locations, in addition to Windows uninstall registry entries:
 
-- 环境变量 `AMPERO_EDITOR_DIR`。
-- `D:\Ampero II`。
-- `%ProgramFiles%\Ampero II`。
-- `%LOCALAPPDATA%\Ampero II`。
-- Windows 卸载注册表中的安装目录。
+- Environment variable `AMPERO_EDITOR_DIR`.
+- `D:\Ampero II`.
+- `%ProgramFiles%\Ampero II`.
+- `%LOCALAPPDATA%\Ampero II`.
 
-如果未自动发现：
+If discovery fails, set the environment variable:
 
 ```powershell
 $env:AMPERO_EDITOR_DIR = "C:\Path\To\Ampero II"
 ```
 
-也可以在单次命令中传递：
+You can also pass the location for one command:
 
 ```powershell
 codex4ampero --editor-dir "C:\Path\To\Ampero II" --json doctor --scan
 ```
 
-### 4. 构建 Dart bridge
+### 4. Build the Dart bridge
 
-如果 `dart.exe` 已加入 `PATH`：
+If `dart.exe` is on `PATH`:
 
 ```powershell
 .\scripts\build-bridge.ps1
 ```
 
-或者显式指定 Dart：
+Or specify the Dart executable explicitly:
 
 ```powershell
 .\scripts\build-bridge.ps1 -DartExe "C:\Path\To\dart.exe"
 ```
 
-输出文件为 `.tools\ampero_bridge.exe`。`.tools/` 已被 Git 忽略，不会发布到仓库。
+The generated file is `.tools\ampero_bridge.exe`. `.tools/` is ignored by Git and is not published with the repository.
 
-### 5. 运行诊断
+### 5. Run diagnostics
 
-确保设备已通过 USB 连接，并关闭官方 `Ampero II.exe`：
+Connect the device over USB and fully close the official `Ampero II.exe`:
 
 ```powershell
 codex4ampero --json doctor --scan
 ```
 
-正常结果应包含：
+A healthy result should include:
 
-- 官方编辑器安装目录。
-- `HTUSBTools.dll` 加载成功。
-- compiled bridge 可用。
-- `Ampero II Stomp` 输入/输出端口索引。
+- The official editor installation directory.
+- Successful loading of `HTUSBTools.dll`.
+- An available compiled bridge.
+- `Ampero II Stomp` input and output port indexes.
 
-### 6. 安装 Codex Skill
+### 6. Install the Codex Skill
 
 ```powershell
 .\scripts\install-skill.ps1 -Force
 ```
 
-脚本会：
+The installer:
 
-1. 将 `skills/ampero-tone` 复制到 `$CODEX_HOME\skills\ampero-tone`，默认 `$CODEX_HOME` 为 `%USERPROFILE%\.codex`。
-2. 设置用户环境变量 `CODEX4AMPERO_ROOT` 为当前仓库目录。
-3. 提示重启 Codex。
+1. Copies `skills/ampero-tone` to `$CODEX_HOME\skills\ampero-tone`. By default, `$CODEX_HOME` is `%USERPROFILE%\.codex`.
+2. Sets the user environment variable `CODEX4AMPERO_ROOT` to the current repository directory.
+3. Prompts you to restart Codex.
 
-安装后请重新启动 Codex CLI，使新的 Skill 和环境变量生效。
+Restart Codex CLI after installation so the new Skill and environment variable take effect.
 
-## 使用 Codex Skill
+## Codex Usage
 
-推荐直接在 Codex 对话中使用：
+Use the Skill directly in a Codex conversation:
 
 ```text
-使用 $ampero-tone。先执行 doctor 和只读 device snapshot，不要修改任何参数。
+Use $ampero-tone. Run doctor and a read-only device snapshot. Do not change any parameters.
 ```
 
 ```text
-使用 $ampero-tone。我的琴是 Fender Telecaster，输出到 FRFR。
-联网调研 Yorushika《花に亡霊》的过载 Solo 音色，先给详细方案和参数，不要直接写入。
+Use $ampero-tone. I use a Fender Telecaster into FRFR.
+Research the overdriven solo tone from Yorushika's "花に亡霊" online.
+Show the detailed chain and parameters before writing anything.
 ```
 
 ```text
-把刚才确认的方案写入 A50-1，允许自动选择目标，但先展示最终预览。
+Write the approved plan to A50-1. Allow automatic target selection, but show the final target-bound preview first.
 ```
 
 ```text
-刚才的音色太亮了，只做小幅参数调整，不换模型。
+The tone is too bright. Make only small parameter adjustments; do not change models.
 ```
 
-Skill 的标准流程：
+The standard Skill workflow is:
 
-1. 收集缺失的吉他和输出信息。
-2. 运行 doctor，并读取当前设备快照。
-3. 对命名歌曲/艺人执行联网调研。
-4. 查询本机官方算法目录。
-5. 给出完整链路、参数、理由、预期结果和局限。
-6. 用户认可音色方向。
-7. 确认精确 `Axx-y` 目标和自动选择行为。
-8. 生成、验证并展示目标绑定计划。
-9. 用户最终确认后执行 `APPLY`。
-10. 写入成功后直接展示 journal 绑定保存预览。
-11. 用户使用 `SAVE:Axx-y` 保存，或明确拒绝保存。
-12. 根据试听反馈进行小步迭代，必要时使用 journal 回滚。
+1. Collect missing guitar and output information.
+2. Run `doctor` and read the current device snapshot.
+3. Research the named song or artist online.
+4. Query the official local algorithm catalog.
+5. Present the complete chain, parameters, reasoning, expected result, and limitations.
+6. Get approval for the tone direction.
+7. Confirm the exact `Axx-y` destination and automatic-selection behavior.
+8. Generate, validate, and show the target-bound plan.
+9. Execute `APPLY` only after final user confirmation.
+10. Show the journal-bound save preview immediately after a successful write.
+11. Save with `SAVE:Axx-y`, or explicitly reject saving.
+12. Iterate in small steps from listening feedback and use the journal for rollback when necessary.
 
-## 命令行使用
+## CLI Usage
 
-日常硬件操作推荐使用 Skill wrapper，因为它提供外层 watchdog：
+For daily hardware operations, use the Skill wrapper because it provides an outer watchdog:
 
 ```powershell
 $python = ".\.venv\Scripts\python.exe"
 ```
 
-### Doctor 与扫描
+### Doctor and scan
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json doctor --scan
 ```
 
-### 当前预设快照
+### Current preset snapshot
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json device snapshot
 & $python .\skills\ampero-tone\scripts\ampero.py --json device snapshot --include-parameters
 ```
 
-### 仅读取路由
+### Read-only routing
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json device routing --timeout 5
 ```
 
-### 查询官方算法目录
+### Query the official algorithm catalog
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json catalog search "blues" --category DRV
 & $python .\skills\ampero-tone\scripts\ampero.py --json catalog show "Dr. Blues" --category DRV
 ```
 
-### 验证与预览计划
+### Validate and preview a plan
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json `
@@ -332,16 +322,16 @@ $python = ".\.venv\Scripts\python.exe"
     plan preview .\examples\clear-rhythm.plan.json
 ```
 
-### 应用计划
+### Apply a plan
 
-没有执行参数时，`plan apply` 仍然只是预览：
+Without execution flags, `plan apply` remains a preview:
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json `
     plan apply .\examples\clear-rhythm.plan.json
 ```
 
-实际写入必须同时提供：
+An actual write requires both flags:
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json `
@@ -349,20 +339,26 @@ $python = ".\.venv\Scripts\python.exe"
     --execute --confirm APPLY
 ```
 
-### 回滚
+### Roll back
+
+Preview a rollback:
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json `
     plan rollback .\.ampero_journals\APPLY.journal.json
+```
 
+Execute it only with the exact rollback confirmation:
+
+```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json `
     plan rollback .\.ampero_journals\APPLY.journal.json `
     --execute --confirm ROLLBACK
 ```
 
-### 保存预设
+### Save a preset
 
-先生成不可回滚预览：
+Generate the irreversible save preview first:
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json `
@@ -370,7 +366,7 @@ $python = ".\.venv\Scripts\python.exe"
     --name "My Preset"
 ```
 
-精确确认后执行：
+Execute only with the target-specific confirmation:
 
 ```powershell
 & $python .\skills\ampero-tone\scripts\ampero.py --json `
@@ -379,9 +375,9 @@ $python = ".\.venv\Scripts\python.exe"
     --execute --confirm SAVE:A50-1
 ```
 
-## 音色计划与保存流程
+## Tone Plans and Save Workflow
 
-计划使用 UTF-8 JSON，当前 schema 为 `1`。示例：
+Plans use UTF-8 JSON. The current schema version is `1`:
 
 ```json
 {
@@ -409,45 +405,45 @@ $python = ".\.venv\Scripts\python.exe"
 }
 ```
 
-详细 schema 见 [plan-schema.md](skills/ampero-tone/references/plan-schema.md)。
+See the [full plan schema](skills/ampero-tone/references/plan-schema.md).
 
-`save_preview_name` 只负责准备保存预览：
+`save_preview_name` prepares a save preview only:
 
-- Tone preview 中的保存预览尚未绑定 journal。
-- `plan apply` 永远不会自动保存。
-- Apply 成功后，CLI 使用真实成功 journal 返回已绑定预览。
-- 最终保存仍需要目标特定的 `SAVE:Axx-y`。
+- The save preview shown before apply is not yet bound to a journal.
+- `plan apply` never saves automatically.
+- After a successful apply, the CLI returns a preview bound to the real successful journal.
+- Final saving still requires the target-specific `SAVE:Axx-y` confirmation.
 
-## 安全边界
+## Safety Boundary
 
-- 直连操作前必须关闭官方编辑器，避免两个进程竞争设备。
-- 建议先降低耳机、音箱或 FRFR 的物理音量。
-- 默认只预览；写入需要 `--execute --confirm APPLY`。
-- 回滚需要 `--execute --confirm ROLLBACK`。
-- 保存需要精确 `SAVE:Axx-y`，且不可由控制层回滚。
-- 输出敏感参数（名称包含 level、output、master、volume）不得超过目录范围的 75%。
-- 模型更换必须成功读取旧模型，才能建立可靠回滚记录。
-- 每条命令都限制在安全白名单中。
-- 不暴露固件、bootloader、删除预设、恢复出厂、全局 I/O 或任意 raw message。
-- `--allow-unverified-reads` 仅用于受控协议研究；Skill 不会自动使用。
-- 不应在演出、录音或高音量监听期间首次测试写入功能。
+- Close the official editor before direct access so two processes do not compete for the device.
+- Start with low physical monitor, headphone, speaker, or FRFR volume.
+- Preview is the default; writes require `--execute --confirm APPLY`.
+- Rollback requires `--execute --confirm ROLLBACK`.
+- Saving requires exact `SAVE:Axx-y` and cannot be rolled back by this control layer.
+- Output-sensitive parameters whose names contain `level`, `output`, `master`, or `volume` cannot exceed 75% of their catalog range.
+- Model changes require a successful read of the old model before a reliable rollback record can be created.
+- Every command is restricted to a safety whitelist.
+- Firmware, bootloader, preset deletion, factory reset, global I/O, and arbitrary raw messages are not exposed.
+- `--allow-unverified-reads` is reserved for controlled protocol research; the Skill never uses it automatically.
+- Do not test write operations for the first time during a performance, recording session, or high-volume monitoring.
 
-完整安全模型见 [docs/safety.md](docs/safety.md)。
+See the complete [safety model](docs/safety.md).
 
-## 故障排查
+## Troubleshooting
 
-### `Official editor is running` / 端口被占用
+### `Official editor is running` or port is busy
 
-完全退出 `Ampero II.exe`，包括后台残留进程，然后重试。官方编辑器和本项目不能同时持有直连通信状态。
+Fully exit `Ampero II.exe`, including orphaned background processes, then retry. The official editor and this project cannot hold direct communication state at the same time.
 
-### 找不到官方编辑器
+### Official editor not found
 
 ```powershell
 $env:AMPERO_EDITOR_DIR = "C:\Path\To\Ampero II"
 codex4ampero --json doctor --scan
 ```
 
-检查安装目录中是否存在：
+Check that the installation directory contains:
 
 - `Ampero II.exe`
 - `assets\HTUSBTools.dll`
@@ -455,380 +451,71 @@ codex4ampero --json doctor --scan
 
 ### `bridge_available: false`
 
-重新构建：
+Rebuild the bridge:
 
 ```powershell
 .\scripts\build-bridge.ps1
 ```
 
-确认 `.tools\ampero_bridge.exe` 已生成。
+Confirm that `.tools\ampero_bridge.exe` exists.
 
-### 找不到 `codex4ampero` 仓库
+### Installed Skill cannot find the repository
 
-重新安装 Skill：
+Reinstall the Skill:
 
 ```powershell
 .\scripts\install-skill.ps1 -Force
 ```
 
-或手动设置：
+Or set the repository path manually:
 
 ```powershell
 $env:CODEX4AMPERO_ROOT = "C:\Path\To\codex4ampero"
 ```
 
-旧环境变量 `VIBE_AMPERO_ROOT` 仍被兼容读取，但新安装只设置 `CODEX4AMPERO_ROOT`。
+The legacy `VIBE_AMPERO_ROOT` variable is still read for compatibility, but new installations set only `CODEX4AMPERO_ROOT`.
 
-### `DeviceTimeoutError` 或 `WatchdogTimeout`
+### `DeviceTimeoutError` or `WatchdogTimeout`
 
-- 不要无限重试。
-- 确认编辑器已关闭。
-- 检查 USB 线和设备端口。
-- 结束残留 `ampero_bridge.exe` 后仅重试一次。
-- 重新插拔 USB 后先执行只读 handshake 或 snapshot。
-- 如果不可回滚操作已经进入发送阶段，不要自动重复发送。
+- Do not retry indefinitely.
+- Confirm that the official editor is closed.
+- Check the USB cable and device port.
+- Terminate any orphaned `ampero_bridge.exe` process and retry only once.
+- After reconnecting USB, run a read-only handshake or snapshot first.
+- If an irreversible operation has entered its sending phase, do not resend it automatically.
 
-### 保存命令超时
+### Save command timeout
 
-部分固件可能已经保存，但没有返回正式响应。控制层会记录：
+Some firmware may save successfully but fail to return the official response. The controller records:
 
-- 精确目标预检是否通过。
-- 是否已经进入 `sending_save`。
-- 是否收到正式保存响应。
+- Whether the exact target preflight passed.
+- Whether the operation entered `sending_save`.
+- Whether an official save response was received.
 
-当状态不明确时，不要自动重发；保留 `*.save.journal.json`，并在设备上确认或手动保存。
+When the state is ambiguous, do not resend automatically. Preserve the `*.save.journal.json` file and verify or save manually on the device.
 
-### 设备返回 `0xffff`
+### Device returns `0xffff`
 
-这表示协议无法确认当前补丁位置。写入默认被阻止。只有计划包含精确 `target_patch`，且用户重新确认设备屏幕上的同一 `Axx-y` 标签时，才能使用 `--confirm-device-patch` 继续。
+This means the protocol cannot confirm the current patch location, so writes are blocked by default. To continue, the plan must contain an exact `target_patch`, and the user must freshly confirm that the device display shows the same `Axx-y` label using `--confirm-device-patch`.
 
-## 开发与测试
+## Development and Testing
 
-### 仓库结构
+### Repository structure
 
 ```text
 codex4ampero/
 ├── bridge/                      Dart FFI / NativePort bridge
-├── docs/                        架构、协议、安全和开发文档
-├── examples/                    Schema v1 音色计划
-├── scripts/                     构建、测试和 Skill 安装脚本
+├── docs/                        Architecture, protocol, safety, and development docs
+├── examples/                    Schema v1 tone plans
+├── scripts/                     Build, test, and Skill installation scripts
 ├── skills/ampero-tone/          Codex Skill
-├── src/ampero_control/          Python 控制层
-├── tests/                       单元测试
-├── pyproject.toml               Python 包元数据
-└── README.md                    中英文项目说明
+├── src/ampero_control/          Python control layer
+├── tests/                       Unit tests
+├── pyproject.toml               Python package metadata
+└── README.md                    Project documentation
 ```
 
-### 运行测试
-
-```powershell
-.\scripts\test.ps1
-```
-
-或者：
-
-```powershell
-$env:PYTHONPATH = "src;tests"
-python -m unittest discover -s tests -v
-```
-
-### Skill 校验
-
-如果本机 Codex 安装包含 `skill-creator`：
-
-```powershell
-python "$HOME\.codex\skills\.system\skill-creator\scripts\quick_validate.py" `
-    .\skills\ampero-tone
-```
-
-### 发布前检查
-
-```powershell
-git diff --check
-.\scripts\test.ps1
-.\scripts\install-skill.ps1 -Force
-```
-
-不要提交：
-
-- `.ampero_journals/`
-- `.tools/`
-- 官方编辑器文件和 `HTUSBTools.dll`
-- 官方算法目录
-- Dart SDK
-- USB 抓包、用户预设备份或包含个人路径的日志
-
-## 发布到 GitHub
-
-创建名为 `codex4ampero` 的空 GitHub 仓库后：
-
-```powershell
-git remote add origin https://github.com/YOUR_USERNAME/codex4ampero.git
-git push -u origin main
-```
-
-如果已经存在 `origin`：
-
-```powershell
-git remote set-url origin https://github.com/YOUR_USERNAME/codex4ampero.git
-git push -u origin main
-```
-
-仓库内的 `.github/workflows/tests.yml` 会在 Windows 上使用 Python 3.9 和 3.12 运行完整单元测试。
-
-## 许可证与商标
-
-当前仓库**尚未选择开源许可证**。在添加 `LICENSE` 前，默认版权规则适用，其他人没有自动获得复制、修改或再分发代码的许可。正式公开发布前，请根据你的目标选择 MIT、Apache-2.0、GPL 或其他许可证。
-
-HOTONE、Ampero、Ampero II Stomp 及相关产品名称属于其各自权利人。本项目仅为识别兼容设备而使用这些名称。OpenAI、Codex 及相关名称属于 OpenAI。本项目与 HOTONE 或 OpenAI 均无隶属或官方背书关系。
-
----
-
-## English
-
-`codex4ampero` is a Codex-native tone agent and safety-focused local control layer for the **HOTONE Ampero II Stomp**.
-
-You can ask Codex to research a song tone, inspect the current preset, propose a complete signal chain, preview exact parameter changes, apply an approved plan, prepare an irreversible save preview, refine the result from listening feedback, or roll back a failed/unwanted change.
-
-> [!IMPORTANT]
-> This is an independent compatibility-research project. It is not an official HOTONE or OpenAI product. The repository does not distribute the HOTONE editor, `HTUSBTools.dll`, firmware, the official algorithm catalog, or prebuilt vendor components.
-
-## Features
-
-- Codex Skill conversation flow with guitar/output context collection.
-- Structured web research for artist-, song-, album-, and era-specific tones.
-- Explicit separation of sourced facts, catalog facts, engineering inferences, limitations, and confidence.
-- Runtime discovery of the official editor, communication DLL, and newest locally installed algorithm catalog.
-- Exact catalog-backed effect, model, parameter, range, and enum resolution.
-- Bounded read-only scene, preset, slot, parameter, patch-location, and routing snapshots.
-- Exact `Axx-y` patch addressing and optional automatic target selection.
-- Verified model, parameter, scene, and routing writes.
-- Immediate per-command readback verification.
-- Preflight journals and reverse-order rollback.
-- Separate journal-bound preset saving with exact `SAVE:Axx-y` confirmation.
-- `save_preview_name` support so apply results can immediately include the exact save preview without a redundant “Do you want to save?” round trip.
-- Worker-process isolation and hard watchdog timeouts around vendor DLL operations.
-
-## Compatibility
-
-Current release: **0.2.0 (Alpha)**
-
-| Item | Status |
-| --- | --- |
-| Operating system | Windows x64 |
-| Verified hardware | HOTONE Ampero II Stomp |
-| Python | 3.9+ x64 |
-| Official editor | Required locally; must be closed during direct device access |
-| Tested local catalog | `v1.0.8` |
-| Read-only snapshots | Verified on hardware |
-| Serial routing | Verified on hardware |
-| Model/parameter writes | Verified on hardware |
-| Immediate readbacks | Verified on hardware |
-| Exact target selection | Implemented and verified |
-| Journal/rollback data | Implemented and verified |
-| Preset save | Implemented; some firmware may drop the official response after persisting |
-| Ampero II / Ampero II Stage | Not verified; do not assume protocol equivalence |
-
-On July 18, 2026, a real `A50-1` plan containing 21 routing/model/parameter commands completed with 21 verified readbacks. The preset-save payload has also been observed to persist on hardware, but the tested firmware can stop responding after save. In that ambiguous case the controller intentionally reports the save as unverified instead of claiming success.
-
-## Architecture
-
-```text
-Codex conversation
-       |
-       v
-ampero-tone Skill
-research, proposal approval, destination approval, write/save gates
-       |
-       v
-Python package: ampero_control
-catalog, validation, safety, previews, journals, rollback, save preparation
-       |
-       v
-Dart NativePort bridge
-vendor DLL connection, timer pump, request/response transport
-       |
-       v
-HOTONE Ampero II Stomp
-```
-
-Connected callbacks from the official Flutter editor rely on the Dart DL API and a real `ReceivePort.nativePort`. Python `ctypes` is used only for safe DLL diagnostics and port scanning; connected requests are delegated to a supervised Dart child process.
-
-See [Architecture](docs/architecture.md), [Protocol notes](docs/protocol.md), [Safety](docs/safety.md), [Development](docs/development.md), and the [Changelog](CHANGELOG.md).
-
-## Requirements
-
-1. Windows x64.
-2. HOTONE Ampero II Stomp connected over USB.
-3. The official Ampero II Editor from the [HOTONE support site](https://www.hotoneaudio.com/support).
-4. Python 3.9+ x64 from the [official Python downloads](https://www.python.org/downloads/windows/).
-5. Dart SDK 3.3+ to build the local bridge; see [Get Dart](https://dart.dev/get-dart).
-6. Codex CLI for the conversational workflow; see the [official OpenAI Codex CLI documentation](https://developers.openai.com/codex/cli).
-
-Install Codex CLI with the official npm package when Node.js/npm is available:
-
-```powershell
-npm install -g @openai/codex
-codex
-```
-
-## Installation
-
-### 1. Clone
-
-Replace `YOUR_USERNAME` with the actual repository owner:
-
-```powershell
-git clone https://github.com/YOUR_USERNAME/codex4ampero.git
-cd codex4ampero
-```
-
-### 2. Install the Python package
-
-```powershell
-py -3.9 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e .
-```
-
-The package installs two equivalent entry points:
-
-- `codex4ampero` — recommended.
-- `ampero-control` — backward-compatible alias.
-
-### 3. Locate the official editor
-
-The application checks `AMPERO_EDITOR_DIR`, common installation directories, and Windows uninstall registry entries. Override discovery when necessary:
-
-```powershell
-$env:AMPERO_EDITOR_DIR = "C:\Path\To\Ampero II"
-```
-
-### 4. Build the Dart bridge
-
-When `dart.exe` is on `PATH`:
-
-```powershell
-.\scripts\build-bridge.ps1
-```
-
-Or specify the SDK explicitly:
-
-```powershell
-.\scripts\build-bridge.ps1 -DartExe "C:\Path\To\dart.exe"
-```
-
-The generated executable is `.tools\ampero_bridge.exe`; it is intentionally ignored by Git.
-
-### 5. Run diagnostics
-
-Connect the device over USB and fully close `Ampero II.exe`:
-
-```powershell
-codex4ampero --json doctor --scan
-```
-
-### 6. Install the Codex Skill
-
-```powershell
-.\scripts\install-skill.ps1 -Force
-```
-
-The installer copies the Skill to `$CODEX_HOME\skills\ampero-tone`, sets the user environment variable `CODEX4AMPERO_ROOT`, and asks you to restart Codex.
-
-## Codex Usage
-
-Examples:
-
-```text
-Use $ampero-tone. Run doctor and a read-only device snapshot. Do not change anything.
-```
-
-```text
-Use $ampero-tone. I use a Telecaster into FRFR. Research the overdriven solo tone from a named song, then show the full chain and parameters before writing anything.
-```
-
-```text
-Apply the approved plan to A50-1, allow automatic target selection, but show the exact target-bound preview first.
-```
-
-The Skill workflow deliberately separates tone approval, destination approval, final write approval, and irreversible save confirmation.
-
-## CLI Quick Reference
-
-Use the wrapper for hardware commands because it adds a hard watchdog:
-
-```powershell
-$python = ".\.venv\Scripts\python.exe"
-
-& $python .\skills\ampero-tone\scripts\ampero.py --json doctor --scan
-& $python .\skills\ampero-tone\scripts\ampero.py --json device snapshot --include-parameters
-& $python .\skills\ampero-tone\scripts\ampero.py --json device routing --timeout 5
-& $python .\skills\ampero-tone\scripts\ampero.py --json catalog search "blues" --category DRV
-& $python .\skills\ampero-tone\scripts\ampero.py --json plan preview .\examples\clear-rhythm.plan.json
-```
-
-Apply an approved plan:
-
-```powershell
-& $python .\skills\ampero-tone\scripts\ampero.py --json `
-    plan apply .\examples\clear-rhythm.plan.json `
-    --execute --confirm APPLY
-```
-
-Roll back from an apply journal:
-
-```powershell
-& $python .\skills\ampero-tone\scripts\ampero.py --json `
-    plan rollback .\.ampero_journals\APPLY.journal.json `
-    --execute --confirm ROLLBACK
-```
-
-Save the verified live buffer:
-
-```powershell
-& $python .\skills\ampero-tone\scripts\ampero.py --json `
-    plan save .\.ampero_journals\APPLY.journal.json `
-    --name "My Preset" `
-    --execute --confirm SAVE:A50-1
-```
-
-## Plan and Save Semantics
-
-Plans are UTF-8 JSON using schema version `1`. See [the full schema](skills/ampero-tone/references/plan-schema.md).
-
-`save_preview_name` does not save anything. It lets the tone preview show the future target/name/payload/token, and lets a successful apply response immediately return an exact journal-bound save preview. The final save remains a separate irreversible operation requiring `SAVE:Axx-y`.
-
-## Safety Boundary
-
-- Close the official editor before direct access.
-- Start with low physical monitor/headphone/FRFR volume.
-- Preview is the default.
-- Writes require `--execute --confirm APPLY`.
-- Rollback requires `--execute --confirm ROLLBACK`.
-- Save requires exact `SAVE:Axx-y` and cannot be rolled back by this project.
-- Output-sensitive parameters are capped at 75% of their declared range.
-- Model changes require verified preflight reads.
-- Commands are restricted to a small whitelist.
-- Firmware, bootloader, delete, factory-reset, global I/O, and arbitrary raw messages are not exposed.
-- Never retry an ambiguous irreversible operation indefinitely.
-
-See [docs/safety.md](docs/safety.md).
-
-## Troubleshooting
-
-- **Editor/device busy:** fully close `Ampero II.exe` and any orphan `ampero_bridge.exe` process.
-- **Editor not found:** set `AMPERO_EDITOR_DIR`.
-- **Bridge unavailable:** run `scripts/build-bridge.ps1` and verify `.tools/ampero_bridge.exe`.
-- **Repository not found by the installed Skill:** reinstall the Skill or set `CODEX4AMPERO_ROOT`.
-- **Timeout:** stop after the bounded failure, check USB/editor state, and retry at most once when the operation is reversible/read-only.
-- **Save timeout:** the device may have persisted while dropping the response. Preserve the save journal and do not automatically resend.
-- **Patch index `0xffff`:** writes remain blocked until an exact physical display label is freshly confirmed.
-
-## Development
-
-Run all tests:
+### Run tests
 
 ```powershell
 .\scripts\test.ps1
@@ -841,30 +528,52 @@ $env:PYTHONPATH = "src;tests"
 python -m unittest discover -s tests -v
 ```
 
-Validate the Skill when the system `skill-creator` is available:
+### Validate the Skill
+
+If the local Codex installation includes `skill-creator`:
 
 ```powershell
 python "$HOME\.codex\skills\.system\skill-creator\scripts\quick_validate.py" `
     .\skills\ampero-tone
 ```
 
-Do not commit generated journals, `.tools/`, vendor binaries, official catalog data, user preset backups, or logs containing personal paths.
+### Pre-release checks
 
-Windows GitHub Actions runs the unit suite on Python 3.9 and 3.12.
+```powershell
+git diff --check
+.\scripts\test.ps1
+.\scripts\install-skill.ps1 -Force
+```
+
+Do not commit:
+
+- `.ampero_journals/`
+- `.tools/`
+- Official editor files or `HTUSBTools.dll`
+- The official algorithm catalog
+- The Dart SDK
+- USB captures, user preset backups, or logs containing personal paths
+
+The `.github/workflows/tests.yml` workflow runs the complete unit test suite on Windows with Python 3.9 and 3.12.
 
 ## Publishing to GitHub
 
-Create an empty repository named `codex4ampero`, then run:
+Create an empty GitHub repository named `codex4ampero`, then run:
 
 ```powershell
 git remote add origin https://github.com/YOUR_USERNAME/codex4ampero.git
 git push -u origin main
 ```
 
-If `origin` already exists, use `git remote set-url origin ...` before pushing.
+If `origin` already exists:
+
+```powershell
+git remote set-url origin https://github.com/YOUR_USERNAME/codex4ampero.git
+git push -u origin main
+```
 
 ## License and Trademarks
 
-**No open-source license has been selected yet.** Until a `LICENSE` file is added, default copyright law applies and others do not automatically receive permission to copy, modify, or redistribute the code. Choose an appropriate license before inviting redistribution or external contributions.
+**No open-source license has been selected yet.** Until a `LICENSE` file is added, default copyright law applies and others do not automatically receive permission to copy, modify, or redistribute the code. Before public release, choose an appropriate license such as MIT, Apache-2.0, GPL, or another license that matches the project goals.
 
-HOTONE, Ampero, Ampero II Stomp, and related product names belong to their respective owners. OpenAI and Codex belong to OpenAI. Their names are used only to identify compatibility and integration targets. This project is not affiliated with or endorsed by HOTONE or OpenAI.
+HOTONE, Ampero, Ampero II Stomp, and related product names belong to their respective owners. This project uses these names only to identify compatible devices. OpenAI, Codex, and related names belong to OpenAI. This project is not affiliated with or endorsed by HOTONE or OpenAI.
