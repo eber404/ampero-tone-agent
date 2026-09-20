@@ -5,7 +5,7 @@
 - Rollback writes require both `--execute` and the literal token `ROLLBACK`.
 - Preset save requires a successful apply journal and the target-specific token `SAVE:Axx-y`.
 - The official editor process blocks direct connection by default.
-- The Codex Skill wrapper isolates native-DLL calls in a worker process and forcibly terminates blocked scans after a bounded timeout.
+- The Codex Skill wrapper isolates native-library calls in a worker process and forcibly terminates blocked scans after a bounded timeout.
 - Effect and parameter names must exist in the installed catalog.
 - Values must remain inside catalog-declared ranges.
 - Parameters named level, output, master, or volume are capped at 75% of their range.

@@ -53,6 +53,20 @@ class SkillWrapperTests(unittest.TestCase):
             ):
                 self.assertEqual(self.wrapper._project_root(), Path(directory))
 
+    def test_installed_root_marker_is_supported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            script = temporary / "skills" / "ampero-tone" / "scripts" / "ampero.py"
+            script.parent.mkdir(parents=True)
+            marker = script.parents[1] / ".codex4ampero-root"
+            project_root = temporary / "repository"
+            marker.write_text(str(project_root), encoding="utf-8")
+
+            with patch.dict(os.environ, {}, clear=True), patch.object(
+                self.wrapper, "__file__", str(script)
+            ):
+                self.assertEqual(self.wrapper._project_root(), project_root)
+
     def test_wrapper_has_no_machine_specific_fallback(self):
         source = WRAPPER_PATH.read_text(encoding="utf-8")
         self.assertNotIn("E:\\vibe_ampere", source)

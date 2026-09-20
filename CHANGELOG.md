@@ -2,6 +2,12 @@
 
 All notable project changes are documented in this file.
 
+## Unreleased
+
+- Added native macOS editor discovery and `HTUSBTools.dylib` loading.
+- Added an extensionless macOS Dart bridge build and shell scripts for build, test, and Skill installation.
+- Added Windows/macOS CI coverage and platform-specific tests.
+
 ## 0.2.0 - 2026-07-18
 
 - Added exact `Axx-y` patch addressing and optional automatic target selection.

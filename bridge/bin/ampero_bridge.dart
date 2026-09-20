@@ -540,8 +540,8 @@ Future<void> main(List<String> arguments) async {
   if (arguments.length < 2 ||
       !{'probe-scene', 'probe-slot', 'serve'}.contains(arguments.first)) {
     stderr.writeln(
-      'usage: ampero_bridge probe-scene DLL_PATH | '
-      'probe-slot DLL_PATH SLOT_ID | serve DLL_PATH',
+      'usage: ampero_bridge probe-scene NATIVE_LIBRARY_PATH | '
+      'probe-slot NATIVE_LIBRARY_PATH SLOT_ID | serve NATIVE_LIBRARY_PATH',
     );
     exitCode = 64;
     return;

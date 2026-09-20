@@ -12,7 +12,8 @@ dependencies = []
 keywords = ["codex", "guitar", "ampero", "hotone", "effects", "midi"]
 classifiers = [
   "Development Status :: 3 - Alpha",
-  "Environment :: Win32 (MS Windows)",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS :: MacOS X",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.9",

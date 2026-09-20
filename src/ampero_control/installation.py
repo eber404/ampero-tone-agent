@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Optional
@@ -20,12 +21,17 @@ def _candidate_roots() -> Iterator[Path]:
     if configured:
         yield Path(configured)
 
-    yield Path(r"D:\Ampero II")
-    yield Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Ampero II"
-    yield Path(os.environ.get("LOCALAPPDATA", "")) / "Ampero II"
+    if sys.platform == "darwin":
+        yield Path("/Applications/Ampero II.app")
+        yield Path.home() / "Applications" / "Ampero II.app"
+        return
 
     if os.name != "nt":
         return
+
+    yield Path(r"D:\Ampero II")
+    yield Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Ampero II"
+    yield Path(os.environ.get("LOCALAPPDATA", "")) / "Ampero II"
 
     try:
         import winreg
@@ -82,9 +88,23 @@ def locate_editor(explicit_root: Optional[Path] = None) -> EditorInstallation:
         if key in seen:
             continue
         seen.add(key)
-        executable = root / "Ampero II.exe"
-        native_library = root / "assets" / "HTUSBTools.dll"
-        catalog_directory = root / "data" / "flutter_assets" / "assets" / "data"
+        if sys.platform == "darwin":
+            executable = root / "Contents" / "MacOS" / "Ampero II"
+            native_library = root / "Contents" / "Frameworks" / "HTUSBTools.dylib"
+            catalog_directory = (
+                root
+                / "Contents"
+                / "Frameworks"
+                / "App.framework"
+                / "Resources"
+                / "flutter_assets"
+                / "assets"
+                / "data"
+            )
+        else:
+            executable = root / "Ampero II.exe"
+            native_library = root / "assets" / "HTUSBTools.dll"
+            catalog_directory = root / "data" / "flutter_assets" / "assets" / "data"
         if executable.is_file() and native_library.is_file() and catalog_directory.is_dir():
             return EditorInstallation(
                 root=root.resolve(),
