@@ -436,7 +436,7 @@ class DeviceController:
         payload = pack_int(target_patch.index, 4)
         if len(payload) != 4:
             raise PlanValidationError("patch selection payload must contain four bytes")
-        transport.send(int(Command.PRESET_INDEX), payload, MessageFlag.SEND)
+        transport.send(int(Command.PRESET_CHANGE), payload, MessageFlag.SEND)
         time.sleep(0.25)
         transport.request(int(Command.CURRENT_PRESET), timeout=10.0)
         selected_index = self._read_patch_index(transport, timeout=3.0)

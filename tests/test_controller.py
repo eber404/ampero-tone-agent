@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from ampero_control.catalog import EffectCatalog
-from ampero_control.constants import Command
+from ampero_control.constants import Command, MessageFlag
 from ampero_control.controller import DeviceController, prepare_plan
 from ampero_control.errors import (
     DeviceTimeoutError,
@@ -122,7 +122,7 @@ class FakeTransport:
 
     def send(self, address, data, flag):
         self.sent.append((address, data, int(flag)))
-        if address == int(Command.PRESET_INDEX):
+        if address in (int(Command.PRESET_INDEX), int(Command.PRESET_CHANGE)):
             self.patch_index = int.from_bytes(data[0:4], "little", signed=False)
         elif address == int(Command.PRESET_SLOT_MODULE):
             slot, category_id, model_code, enabled = decode_model(data)
@@ -579,6 +579,10 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(
             result["current_patch"]["verification"],
             "auto_selected_and_device_verified",
+        )
+        self.assertIn(
+            (int(Command.PRESET_CHANGE), pack_int(150, 4), int(MessageFlag.SEND)),
+            FakeTransport.instances[-1].sent,
         )
 
 
