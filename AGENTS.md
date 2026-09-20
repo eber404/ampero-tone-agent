@@ -33,6 +33,7 @@ libraries, firmware, algorithm catalogs, or user preset data.
 - Do not expose firmware, bootloader, factory reset, preset deletion, global I/O, or raw messages.
 - Do not guess model names, parameter names, ranges, or protocol identifiers.
 - Do not claim hardware behavior without hardware evidence.
+- Do not use disabled effects as placeholder models to clear unrelated slots. Modify only slots required by the approved chain; if slot clearing is unsupported, preserve untouched slots and disclose the limitation.
 
 `plan apply` changes the live editing buffer. `plan save` writes a preset and
 cannot be undone by this project.
