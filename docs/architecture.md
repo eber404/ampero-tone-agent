@@ -12,7 +12,7 @@
   sourced facts, tone inferences, limitations, dates, and confidence levels.
 - `src/ampero_control/safety.py`: blocks unsupported ranges and
   output-sensitive values.
-- `src/ampero_control/native.py`: loads the vendor DLL for installation
+- `src/ampero_control/native.py`: loads the vendor native library for installation
   diagnostics and input/output scanning only. It intentionally rejects connected
   requests and sends from Python.
 - `bridge/bin/ampero_bridge.dart`: initializes the Dart DL API, registers a real
@@ -32,7 +32,7 @@
 
 ## Transport Boundary
 
-The vendor DLL's scan callbacks work through ordinary native callbacks and may be
+The vendor library's scan callbacks work through ordinary native callbacks and may be
 used by the Python diagnostic transport. Connected responses depend on the Dart
 DL API and a registered Dart NativePort. A Python-only `ctypes` connection can
 receive an initial native event and then terminate the process, so connected
@@ -50,9 +50,9 @@ device messages. The deterministic control layer resolves names against the
 installed catalog, validates ranges, allows only a small command whitelist,
 previews encoded payloads, and requires explicit execution confirmation.
 
-The repository does not contain or redistribute `HTUSBTools.dll` or the official
-algorithm catalog. Both are discovered at runtime from the user's official editor
-installation.
+The repository does not contain or redistribute `HTUSBTools.dll`,
+`HTUSBTools.dylib`, or the official algorithm catalog. They are discovered at
+runtime from the user's official editor installation.
 
 ## Product Shape
 

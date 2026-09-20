@@ -3,6 +3,7 @@ import os
 import queue
 import shutil
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from typing import Optional
@@ -18,13 +19,23 @@ from .native import official_editor_is_running
 from .protocol import ReceivedMessage
 
 
+def _bridge_executable_name() -> str:
+    return "ampero_bridge.exe" if sys.platform == "win32" else "ampero_bridge"
+
+
+def _dart_executable_name() -> str:
+    return "dart.exe" if sys.platform == "win32" else "dart"
+
+
 class DartBridgeTransport:
     def __init__(self, installation: EditorInstallation):
         self.installation = installation
         self.project_root = Path(__file__).resolve().parents[2]
         self.bridge_root = self.project_root / "bridge"
         self.bridge_script = self.bridge_root / "bin" / "ampero_bridge.dart"
-        self.bridge_executable = self.project_root / ".tools" / "ampero_bridge.exe"
+        self.bridge_executable = (
+            self.project_root / ".tools" / _bridge_executable_name()
+        )
         self.dart_executable = (
             None if self.bridge_executable.is_file() else self._locate_dart()
         )
@@ -41,7 +52,11 @@ class DartBridgeTransport:
         configured = os.environ.get("AMPERO_DART_EXE")
         candidates = [
             Path(configured) if configured else None,
-            self.project_root / ".tools" / "dart-sdk" / "bin" / "dart.exe",
+            self.project_root
+            / ".tools"
+            / "dart-sdk"
+            / "bin"
+            / _dart_executable_name(),
         ]
         system_dart = shutil.which("dart")
         if system_dart:
@@ -54,10 +69,12 @@ class DartBridgeTransport:
             f"under {self.project_root / '.tools' / 'dart-sdk'}."
         )
 
-    def scan(self, device_name: str = DEVICE_NAME) -> dict:
+    def scan(
+        self, device_name: str = DEVICE_NAME, *, allow_editor_running: bool = False
+    ) -> dict:
         if device_name != DEVICE_NAME:
             raise NativeLibraryError(f"unsupported device name: {device_name}")
-        self._ensure_started()
+        self._ensure_started(allow_editor_running=allow_editor_running)
         assert self._scan is not None
         return {
             "device_name": DEVICE_NAME,
@@ -75,9 +92,11 @@ class DartBridgeTransport:
     ) -> None:
         if not allow_editor_running and official_editor_is_running():
             raise DeviceBusyError(
-                "Ampero II.exe is running. Close the official editor before connecting."
+                "The official Ampero II editor is running. Close it before connecting."
             )
-        scan = self.scan(device_name)
+        scan = self.scan(
+            device_name, allow_editor_running=allow_editor_running
+        )
         if input_index is not None and input_index not in scan["input_indices"]:
             raise NativeLibraryError(f"input MIDI index is unavailable: {input_index}")
         if output_index is not None and output_index not in scan["output_indices"]:
@@ -144,12 +163,12 @@ class DartBridgeTransport:
         response = self._call({"op": "diagnostics"}, timeout=3.0)
         return dict(response.get("trace", {}))
 
-    def _ensure_started(self) -> None:
+    def _ensure_started(self, *, allow_editor_running: bool = False) -> None:
         if self._process and self._process.poll() is None:
             return
-        if official_editor_is_running():
+        if not allow_editor_running and official_editor_is_running():
             raise DeviceBusyError(
-                "Ampero II.exe is running. Close the official editor before connecting."
+                "The official Ampero II editor is running. Close it before connecting."
             )
         environment = os.environ.copy()
         environment["PATH"] = os.pathsep.join(

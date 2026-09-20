@@ -3,6 +3,7 @@ import os
 import platform
 import queue
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -32,27 +33,45 @@ SendCallback = ctypes.CFUNCTYPE(
 
 
 def official_editor_is_running() -> bool:
-    if os.name != "nt":
-        return False
-    result = subprocess.run(
-        ["tasklist", "/FI", "IMAGENAME eq Ampero II.exe", "/FO", "CSV", "/NH"],
-        check=False,
-        capture_output=True,
-        text=True,
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-    )
-    return "Ampero II.exe" in result.stdout
+    if os.name == "nt":
+        result = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq Ampero II.exe", "/FO", "CSV", "/NH"],
+            check=False,
+            capture_output=True,
+            text=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        if result.returncode != 0:
+            raise NativeLibraryError(
+                "failed to check whether the official editor is running"
+            )
+        return "Ampero II.exe" in result.stdout
+    if sys.platform == "darwin":
+        result = subprocess.run(
+            ["/usr/bin/pgrep", "-x", "Ampero II"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return True
+        if result.returncode == 1:
+            return False
+        raise NativeLibraryError("failed to check whether the official editor is running")
+    return False
 
 
 class NativeTransport:
     def __init__(self, installation: EditorInstallation):
-        if os.name != "nt":
-            raise NativeLibraryError("the vendor communication library requires Windows")
+        if os.name != "nt" and sys.platform != "darwin":
+            raise NativeLibraryError(
+                "the vendor communication library requires Windows or macOS"
+            )
         if ctypes.sizeof(ctypes.c_void_p) != 8:
             raise NativeLibraryError("a 64-bit Python interpreter is required")
         self.installation = installation
         self._dll_directories = []
-        if hasattr(os, "add_dll_directory"):
+        if os.name == "nt" and hasattr(os, "add_dll_directory"):
             self._dll_directories.append(os.add_dll_directory(str(installation.root)))
             self._dll_directories.append(
                 os.add_dll_directory(str(installation.native_library.parent))
@@ -130,7 +149,7 @@ class NativeTransport:
         allow_editor_running: bool = False,
     ) -> None:
         raise NativeLibraryError(
-            "direct Python device connections are unsupported because the vendor DLL "
+            "direct Python device connections are unsupported because the vendor library "
             "delivers responses through a Dart NativePort; use DartBridgeTransport"
         )
 

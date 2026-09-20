@@ -77,7 +77,7 @@ Codex interprets the goal, researches the tone background of a song or artist, q
 
 ### Hang prevention
 
-- The vendor DLL and Dart bridge run in an isolated worker process.
+- The vendor native library and Dart bridge run in an isolated worker process.
 - The Skill wrapper applies hard outer timeouts to scanning, snapshots, apply, rollback, and save operations.
 - On timeout, the child process is terminated and a structured `WatchdogTimeout` is returned instead of waiting indefinitely.
 
@@ -87,11 +87,12 @@ Current release: **0.2.0 (Alpha)**
 
 | Item | Status |
 | --- | --- |
-| Operating system | Windows x64 |
+| Operating system | Windows x64; macOS arm64/x86_64 |
 | Verified hardware | HOTONE Ampero II Stomp |
-| Python | 3.9+; must be x64 |
+| Python | 3.9+; 64-bit |
 | Official editor | Required locally; must be closed during direct device access |
-| Algorithm catalog | Read dynamically from the local editor; test catalog version is `v1.0.8` |
+| Algorithm catalog | Read dynamically from the local editor; tested with `v1.0.8` and `v1.0.9` |
+| macOS native library | Universal arm64/x86_64 library and required exports verified locally |
 | Read-only snapshots | Verified on real hardware |
 | Routing reads and Serial switching | Verified on real hardware |
 | Model and parameter writes | Verified on real hardware |
@@ -102,6 +103,8 @@ Current release: **0.2.0 (Alpha)**
 | Ampero II / Ampero II Stage | Not verified; do not assume protocol equivalence |
 
 On July 18, 2026, a real `A50-1` tone plan containing 21 commands completed with 21 immediate readback verifications. The preset-save payload has also been observed to persist on hardware, but the tested firmware can stop returning an official response after saving. In that ambiguous case, the controller conservatively reports the save as unverified instead of falsely claiming success.
+
+On macOS, editor discovery, universal arm64/x86_64 native-library loading, compiled bridge startup, and bounded device scanning have been verified. A connected-device read/write qualification is still required before claiming macOS hardware-write verification.
 
 ## Architecture
 
@@ -118,22 +121,22 @@ catalog resolution, plan validation, safety limits, previews, journals, rollback
        |
        v
 Dart NativePort bridge
-vendor DLL connection, timer pump, request/response transport, message sending
+vendor native-library connection, timer pump, request/response transport, message sending
        |
        v
 HOTONE Ampero II Stomp
 ```
 
-The Dart bridge is required because the official Flutter editor uses the Dart DL API and a real `ReceivePort.nativePort` to receive connected-device messages. Ordinary Python `ctypes` can safely load the DLL and scan ports, but it cannot reliably replace this callback model. All connected requests therefore run through a supervised Dart child process.
+The Dart bridge is required because the official Flutter editor uses the Dart DL API and a real `ReceivePort.nativePort` to receive connected-device messages. Ordinary Python `ctypes` can safely load the native library and scan ports, but it cannot reliably replace this callback model. All connected requests therefore run through a supervised Dart child process.
 
 See [Architecture](docs/architecture.md), [Protocol notes](docs/protocol.md), [Safety](docs/safety.md), [Development](docs/development.md), and the [Changelog](CHANGELOG.md).
 
 ## Requirements
 
-1. **Windows x64.**
+1. **Windows x64 or macOS 11+ on arm64/x86_64.**
 2. **HOTONE Ampero II Stomp** connected over USB.
-3. **Official Ampero II Editor.** Install it from the [HOTONE support site](https://www.hotoneaudio.com/support). At runtime, this project reads the communication DLL and algorithm catalog from its installation directory.
-4. **Python 3.9+ x64.** Install it from the [Python Windows downloads](https://www.python.org/downloads/windows/).
+3. **Official Ampero II Editor.** Install it from the [HOTONE support site](https://www.hotoneaudio.com/support). At runtime, this project reads the communication library and algorithm catalog from its installation directory.
+4. **Python 3.9+ 64-bit.** Use the official Python distribution or a platform package manager.
 5. **Dart SDK 3.3+.** Required for the first local bridge build; see [Get Dart](https://dart.dev/get-dart).
 6. **Codex CLI.** Required for the conversational agent workflow; see the [official OpenAI Codex CLI documentation](https://developers.openai.com/codex/cli).
 
@@ -170,6 +173,15 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
+macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
 The installation provides two equivalent commands:
 
 - `codex4ampero` - recommended command name.
@@ -177,12 +189,14 @@ The installation provides two equivalent commands:
 
 ### 3. Configure the official editor location
 
-The application checks these locations, in addition to Windows uninstall registry entries:
+The application checks these locations:
 
 - Environment variable `AMPERO_EDITOR_DIR`.
 - `D:\Ampero II`.
 - `%ProgramFiles%\Ampero II`.
 - `%LOCALAPPDATA%\Ampero II`.
+- `/Applications/Ampero II.app`.
+- `~/Applications/Ampero II.app`.
 
 If discovery fails, set the environment variable:
 
@@ -190,10 +204,18 @@ If discovery fails, set the environment variable:
 $env:AMPERO_EDITOR_DIR = "C:\Path\To\Ampero II"
 ```
 
+```bash
+export AMPERO_EDITOR_DIR="/Applications/Ampero II.app"
+```
+
 You can also pass the location for one command:
 
 ```powershell
 codex4ampero --editor-dir "C:\Path\To\Ampero II" --json doctor --scan
+```
+
+```bash
+codex4ampero --editor-dir "/Applications/Ampero II.app" --json doctor --scan
 ```
 
 ### 4. Build the Dart bridge
@@ -212,9 +234,17 @@ Or specify the Dart executable explicitly:
 
 The generated file is `.tools\ampero_bridge.exe`. `.tools/` is ignored by Git and is not published with the repository.
 
+On macOS:
+
+```bash
+./scripts/build-bridge.sh
+```
+
+The macOS output is `.tools/ampero_bridge`.
+
 ### 5. Run diagnostics
 
-Connect the device over USB and fully close the official `Ampero II.exe`:
+Connect the device over USB and fully close the official Ampero II editor:
 
 ```powershell
 codex4ampero --json doctor --scan
@@ -223,7 +253,7 @@ codex4ampero --json doctor --scan
 A healthy result should include:
 
 - The official editor installation directory.
-- Successful loading of `HTUSBTools.dll`.
+- Successful loading of `HTUSBTools.dll` on Windows or `HTUSBTools.dylib` on macOS.
 - An available compiled bridge.
 - `Ampero II Stomp` input and output port indexes.
 
@@ -233,10 +263,16 @@ A healthy result should include:
 .\scripts\install-skill.ps1 -Force
 ```
 
+On macOS:
+
+```bash
+./scripts/install-skill.sh --force
+```
+
 The installer:
 
 1. Copies `skills/ampero-tone` to `$CODEX_HOME\skills\ampero-tone`. By default, `$CODEX_HOME` is `%USERPROFILE%\.codex`.
-2. Sets the user environment variable `CODEX4AMPERO_ROOT` to the current repository directory.
+2. Records the current repository directory using a user environment variable on Windows or an installed Skill marker on macOS.
 3. Prompts you to restart Codex.
 
 Restart Codex CLI after installation so the new Skill and environment variable take effect.
@@ -434,7 +470,7 @@ See the complete [safety model](docs/safety.md).
 
 ### `Official editor is running` or port is busy
 
-Fully exit `Ampero II.exe`, including orphaned background processes, then retry. The official editor and this project cannot hold direct communication state at the same time.
+Fully exit the official Ampero II editor, including orphaned background processes, then retry. The official editor and this project cannot hold direct communication state at the same time.
 
 ### Official editor not found
 
@@ -449,6 +485,12 @@ Check that the installation directory contains:
 - `assets\HTUSBTools.dll`
 - `data\flutter_assets\assets\data`
 
+On macOS, check the app bundle instead:
+
+- `Contents/MacOS/Ampero II`
+- `Contents/Frameworks/HTUSBTools.dylib`
+- `Contents/Frameworks/App.framework/Resources/flutter_assets/assets/data`
+
 ### `bridge_available: false`
 
 Rebuild the bridge:
@@ -457,7 +499,11 @@ Rebuild the bridge:
 .\scripts\build-bridge.ps1
 ```
 
-Confirm that `.tools\ampero_bridge.exe` exists.
+```bash
+./scripts/build-bridge.sh
+```
+
+Confirm that `.tools\ampero_bridge.exe` on Windows or `.tools/ampero_bridge` on macOS exists.
 
 ### Installed Skill cannot find the repository
 
@@ -465,6 +511,10 @@ Reinstall the Skill:
 
 ```powershell
 .\scripts\install-skill.ps1 -Force
+```
+
+```bash
+./scripts/install-skill.sh --force
 ```
 
 Or set the repository path manually:
@@ -480,7 +530,7 @@ The legacy `VIBE_AMPERO_ROOT` variable is still read for compatibility, but new 
 - Do not retry indefinitely.
 - Confirm that the official editor is closed.
 - Check the USB cable and device port.
-- Terminate any orphaned `ampero_bridge.exe` process and retry only once.
+- Terminate any orphaned `ampero_bridge.exe` or `ampero_bridge` process and retry only once.
 - After reconnecting USB, run a read-only handshake or snapshot first.
 - If an irreversible operation has entered its sending phase, do not resend it automatically.
 
@@ -521,6 +571,10 @@ codex4ampero/
 .\scripts\test.ps1
 ```
 
+```bash
+./scripts/test.sh
+```
+
 Or directly:
 
 ```powershell
@@ -549,12 +603,12 @@ Do not commit:
 
 - `.ampero_journals/`
 - `.tools/`
-- Official editor files or `HTUSBTools.dll`
+- Official editor files, `HTUSBTools.dll`, or `HTUSBTools.dylib`
 - The official algorithm catalog
 - The Dart SDK
 - USB captures, user preset backups, or logs containing personal paths
 
-The `.github/workflows/tests.yml` workflow runs the complete unit test suite on Windows with Python 3.9 and 3.12.
+The `.github/workflows/tests.yml` workflow runs the complete unit test suite on Windows and macOS with Python 3.9 and 3.12.
 
 ## Publishing to GitHub
 

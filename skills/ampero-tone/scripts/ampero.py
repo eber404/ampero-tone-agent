@@ -12,11 +12,17 @@ def _project_root() -> Path:
     )
     if configured:
         return Path(configured)
+    marker = Path(__file__).resolve().parents[1] / ".codex4ampero-root"
+    if marker.is_file():
+        marked_root = marker.read_text(encoding="utf-8").strip()
+        if marked_root:
+            return Path(marked_root)
     local_root = Path(__file__).resolve().parents[3]
     if (local_root / "src" / "ampero_control").is_dir():
         return local_root
     raise RuntimeError(
-        "codex4ampero repository was not found. Re-run scripts/install-skill.ps1 "
+        "codex4ampero repository was not found. Re-run scripts/install-skill.ps1 or "
+        "scripts/install-skill.sh "
         "or set CODEX4AMPERO_ROOT to the cloned repository path."
     )
 
@@ -67,7 +73,7 @@ def _run_with_watchdog(arguments) -> int:
                     "error": "WatchdogTimeout",
                     "message": (
                         f"Ampero control worker exceeded {timeout:g} seconds and was "
-                        "forcibly terminated. The vendor DLL did not return."
+                        "forcibly terminated. The vendor native library did not return."
                     ),
                     "stdout": partial_stdout,
                     "stderr": partial_stderr,

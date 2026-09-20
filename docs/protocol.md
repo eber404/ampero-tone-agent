@@ -5,8 +5,9 @@ this project. They are not an official HOTONE API.
 
 ## Native Interface
 
-The installed Windows editor provides `assets/HTUSBTools.dll`. The verified
-subset uses these exports:
+The installed Windows editor provides `assets/HTUSBTools.dll`. The macOS editor
+provides `Contents/Frameworks/HTUSBTools.dylib`. Both expose the subset used by
+this project:
 
 - `InitDartApiDL(NativeApi.initializeApiDLData)`
 - `scanInDevice(name, callback)`
@@ -86,7 +87,7 @@ not used as false proof of failure.
 On July 18, 2026, a connected Ampero II Stomp was verified with the official
 editor closed:
 
-- DLL loading and port enumeration succeeded (`input 0`, `output 1`).
+- Native-library loading and port enumeration succeeded (`input 0`, `output 1`).
 - Current-scene request `0x03000001` returned scene `0`.
 - Slot-model request `0x01040002` returned an empty slot for slot `0`.
 - Complete current-preset request `0x01000000` returned 5,072 bytes.

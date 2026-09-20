@@ -27,7 +27,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", dest="json_output")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    doctor = subparsers.add_parser("doctor", help="check installation and DLL loading")
+    doctor = subparsers.add_parser(
+        "doctor", help="check installation and native library loading"
+    )
     doctor.add_argument("--scan", action="store_true", help="also enumerate device ports")
 
     device = subparsers.add_parser("device", help="device operations")
