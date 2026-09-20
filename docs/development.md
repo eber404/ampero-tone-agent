@@ -39,13 +39,13 @@ python="${AMPERO_PYTHON:-.venv/bin/python}"
 Windows:
 
 ```powershell
-.\scripts\test.ps1
+.\scripts\windows\test.ps1
 ```
 
 macOS:
 
 ```bash
-./scripts/test.sh
+./scripts/macos/test.sh
 ```
 
 Set `AMPERO_PYTHON` to override Python discovery on either platform.
@@ -58,13 +58,13 @@ SDK can be supplied explicitly.
 Windows:
 
 ```powershell
-.\scripts\build-bridge.ps1 -DartExe C:\Path\To\dart.exe
+.\scripts\windows\build-bridge.ps1 -DartExe C:\Path\To\dart.exe
 ```
 
 macOS:
 
 ```bash
-./scripts/build-bridge.sh /path/to/dart
+./scripts/macos/build-bridge.sh /path/to/dart
 ```
 
 The generated `.tools/ampero_bridge.exe` or `.tools/ampero_bridge`, Dart SDK,
@@ -75,13 +75,13 @@ package cache, journals, and vendor binaries are ignored by Git.
 Windows:
 
 ```powershell
-.\scripts\install-skill.ps1 -Force
+.\scripts\windows\install-skill.ps1 -Force
 ```
 
 macOS:
 
 ```bash
-./scripts/install-skill.sh --force
+./scripts/macos/install-skill.sh --force
 ```
 
 Restart Codex after installation. Do not commit generated journals, bridge

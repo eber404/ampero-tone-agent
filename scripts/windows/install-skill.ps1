@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$projectRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $source = Join-Path $projectRoot "skills\ampero-tone"
 $destinationRoot = Join-Path $CodexHome "skills"
 $destination = Join-Path $destinationRoot "ampero-tone"

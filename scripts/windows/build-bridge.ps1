@@ -3,7 +3,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$projectRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $bridgeRoot = Join-Path $projectRoot "bridge"
 $output = Join-Path $projectRoot ".tools\ampero_bridge.exe"
 

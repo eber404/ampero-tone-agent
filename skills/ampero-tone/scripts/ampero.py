@@ -21,8 +21,8 @@ def _project_root() -> Path:
     if (local_root / "src" / "ampero_control").is_dir():
         return local_root
     raise RuntimeError(
-        "codex4ampero repository was not found. Re-run scripts/install-skill.ps1 or "
-        "scripts/install-skill.sh "
+        "codex4ampero repository was not found. Re-run "
+        "scripts/windows/install-skill.ps1 or scripts/macos/install-skill.sh "
         "or set CODEX4AMPERO_ROOT to the cloned repository path."
     )
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 bridge_root="$project_root/bridge"
 output="$project_root/.tools/ampero_bridge"
 dart_executable="${1:-${AMPERO_DART_EXE:-}}"

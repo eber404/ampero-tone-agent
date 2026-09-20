@@ -223,13 +223,13 @@ codex4ampero --editor-dir "/Applications/Ampero II.app" --json doctor --scan
 If `dart.exe` is on `PATH`:
 
 ```powershell
-.\scripts\build-bridge.ps1
+.\scripts\windows\build-bridge.ps1
 ```
 
 Or specify the Dart executable explicitly:
 
 ```powershell
-.\scripts\build-bridge.ps1 -DartExe "C:\Path\To\dart.exe"
+.\scripts\windows\build-bridge.ps1 -DartExe "C:\Path\To\dart.exe"
 ```
 
 The generated file is `.tools\ampero_bridge.exe`. `.tools/` is ignored by Git and is not published with the repository.
@@ -237,7 +237,7 @@ The generated file is `.tools\ampero_bridge.exe`. `.tools/` is ignored by Git an
 On macOS:
 
 ```bash
-./scripts/build-bridge.sh
+./scripts/macos/build-bridge.sh
 ```
 
 The macOS output is `.tools/ampero_bridge`.
@@ -260,13 +260,13 @@ A healthy result should include:
 ### 6. Install the Codex Skill
 
 ```powershell
-.\scripts\install-skill.ps1 -Force
+.\scripts\windows\install-skill.ps1 -Force
 ```
 
 On macOS:
 
 ```bash
-./scripts/install-skill.sh --force
+./scripts/macos/install-skill.sh --force
 ```
 
 The installer:
@@ -496,11 +496,11 @@ On macOS, check the app bundle instead:
 Rebuild the bridge:
 
 ```powershell
-.\scripts\build-bridge.ps1
+.\scripts\windows\build-bridge.ps1
 ```
 
 ```bash
-./scripts/build-bridge.sh
+./scripts/macos/build-bridge.sh
 ```
 
 Confirm that `.tools\ampero_bridge.exe` on Windows or `.tools/ampero_bridge` on macOS exists.
@@ -510,11 +510,11 @@ Confirm that `.tools\ampero_bridge.exe` on Windows or `.tools/ampero_bridge` on 
 Reinstall the Skill:
 
 ```powershell
-.\scripts\install-skill.ps1 -Force
+.\scripts\windows\install-skill.ps1 -Force
 ```
 
 ```bash
-./scripts/install-skill.sh --force
+./scripts/macos/install-skill.sh --force
 ```
 
 Or set the repository path manually:
@@ -568,11 +568,11 @@ codex4ampero/
 ### Run tests
 
 ```powershell
-.\scripts\test.ps1
+.\scripts\windows\test.ps1
 ```
 
 ```bash
-./scripts/test.sh
+./scripts/macos/test.sh
 ```
 
 Or directly:
@@ -595,8 +595,8 @@ python "$HOME\.codex\skills\.system\skill-creator\scripts\quick_validate.py" `
 
 ```powershell
 git diff --check
-.\scripts\test.ps1
-.\scripts\install-skill.ps1 -Force
+.\scripts\windows\test.ps1
+.\scripts\windows\install-skill.ps1 -Force
 ```
 
 Do not commit:
