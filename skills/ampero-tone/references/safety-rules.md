@@ -15,3 +15,4 @@
 13. Tone approval and hardware-write approval are separate gates. Ask for the exact destination only after tone approval, then require final confirmation of the target-bound preview.
 14. When `save_preview_name` is present, show the journal-bound save preview immediately after apply and ask directly for the exact `SAVE:Axx-y` token or a decline. Otherwise ask for the preset name first. Never include saving automatically in `plan apply`.
 15. A save must be bound to a successful apply journal, use its exact target, record a verified target preflight before sending, and receive the official save response. Save has no automatic rollback. Do not require a post-save request when firmware resets the direct-control session.
+16. Do not use disabled effects as placeholder models to clear unrelated slots. Modify only slots required by the approved chain; if slot clearing is unsupported, preserve untouched slots and disclose the limitation.
