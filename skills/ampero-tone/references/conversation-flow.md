@@ -95,6 +95,15 @@ If automatic selection is requested, explain that loading the target can discard
 unsaved live edits. Never interpret a bank-only value such as `50` as an exact
 patch location.
 
+If the user asks to find an empty destination or list destination slots, run the
+read-only `python scripts/ampero.py --json device patches` inventory command once.
+Use its names and labels to match names visible on the hardware display or to
+identify candidate destinations. The inventory carries no occupancy flag; names
+like "Empty" are string values only and do not prove a slot is empty. Require
+hardware display confirmation for any emptiness determination. Treat the result as
+destination context only; neither listing nor choosing a slot grants write
+approval.
+
 ## Stage 7 - Final Write Gate
 
 Build and validate the schema-version-1 plan only after the destination is known.

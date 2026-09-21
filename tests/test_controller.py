@@ -35,11 +35,13 @@ class FakeTransport:
 
     def __init__(self, installation):
         self.sent = []
+        self.requests = []
         self.connected = False
         self.models = {}
         self.parameters = {}
         self.patch_index = 150
         self.preset_name = "Fixture"
+        self.selected_patch_name = "Empty"
         self.routing_split_node = 0
         self.routing_mix_node = 6
         FakeTransport.instances.append(self)
@@ -60,6 +62,7 @@ class FakeTransport:
         return {"input_indices": [1], "output_indices": [2]}
 
     def request(self, address, data=b"", timeout=2.0):
+        self.requests.append((address, data, timeout))
         if address == int(Command.CURRENT_SCENE):
             return ReceivedMessage(
                 address=address,
@@ -78,6 +81,20 @@ class FakeTransport:
             return ReceivedMessage(
                 address=address,
                 data=pack_int(self.patch_index, 2),
+                flag=0x12,
+                received_at=time.time(),
+            )
+        if address == int(Command.PRESET_INVENTORY):
+            names = [f"Patch {index}" for index in range(300)]
+            names[150] = self.selected_patch_name
+            return ReceivedMessage(
+                address=address,
+                data=(
+                    struct.pack("<300H", *range(300))
+                    + b"".join(
+                        name.encode().ljust(17, b"\x00") for name in names
+                    )
+                ),
                 flag=0x12,
                 received_at=time.time(),
             )
@@ -122,7 +139,7 @@ class FakeTransport:
 
     def send(self, address, data, flag):
         self.sent.append((address, data, int(flag)))
-        if address in (int(Command.PRESET_INDEX), int(Command.PRESET_CHANGE)):
+        if address == int(Command.PRESET_INDEX):
             self.patch_index = int.from_bytes(data[0:4], "little", signed=False)
         elif address == int(Command.PRESET_SLOT_MODULE):
             slot, category_id, model_code, enabled = decode_model(data)
@@ -201,10 +218,29 @@ class CurrentPresetTimeoutTransport(FakeTransport):
         return super().request(address, data, timeout)
 
 
+class InventoryTimeoutTransport(FakeTransport):
+    def request(self, address, data=b"", timeout=2.0):
+        if address == int(Command.PRESET_INVENTORY):
+            raise DeviceTimeoutError("patch inventory unavailable")
+        return super().request(address, data, timeout)
+
+
+class MatchingPatchNameTransport(FakeTransport):
+    def __init__(self, installation):
+        super().__init__(installation)
+        self.selected_patch_name = "Fixture"
+
+
 class UnknownPatchTransport(FakeTransport):
     def __init__(self, installation):
         super().__init__(installation)
         self.patch_index = -1
+
+
+class OutOfRangePatchTransport(FakeTransport):
+    def __init__(self, installation):
+        super().__init__(installation)
+        self.patch_index = 300
 
 
 class WrongSaveTargetTransport(FakeTransport):
@@ -349,13 +385,119 @@ class ControllerTests(unittest.TestCase):
         )
         snapshot = controller.snapshot(slot_count=2, include_parameters=True)
         self.assertEqual(snapshot["slot_count"], 2)
-        self.assertEqual(snapshot["preset_name"], "Fixture")
+        self.assertEqual(snapshot["patch_name"], "Empty")
+        self.assertEqual(snapshot["preset_name"], "Empty")
+        self.assertEqual(snapshot["edit_buffer_name"], "Fixture")
+        self.assertFalse(snapshot["edit_buffer_name_matches_patch"])
+        self.assertNotIn("edit_buffer_matches_patch", snapshot)
+        self.assertEqual(snapshot["preset_name_source"], "patch_inventory")
         self.assertTrue(snapshot["patch_location_verified"])
         self.assertEqual(snapshot["patch_index"], 150)
         self.assertEqual(snapshot["patch_label"], "A50-1")
         self.assertEqual(snapshot["slots"][0]["effect"]["name"], "Test Clean")
         self.assertEqual(snapshot["slots"][0]["parameters"][0]["value"], 42.0)
         self.assertTrue(snapshot["slots"][1]["empty"])
+
+    def test_snapshot_reports_matching_edit_buffer_and_patch_names(self):
+        controller = DeviceController(
+            self.installation,
+            self.catalog,
+            transport_factory=MatchingPatchNameTransport,
+        )
+
+        snapshot = controller.snapshot(slot_count=2)
+
+        self.assertEqual(snapshot["patch_name"], "Fixture")
+        self.assertEqual(snapshot["edit_buffer_name"], "Fixture")
+        self.assertTrue(snapshot["edit_buffer_name_matches_patch"])
+        self.assertNotIn("edit_buffer_matches_patch", snapshot)
+
+    def test_patches_returns_named_patch_locations(self):
+        controller = DeviceController(
+            self.installation, transport_factory=FakeTransport
+        )
+
+        patches = controller.patches()
+
+        self.assertEqual(len(patches), 300)
+        self.assertEqual(
+            patches[0],
+            {
+                "index": 0,
+                "bank": 0,
+                "patch": 1,
+                "label": "A00-1",
+                "name": "Patch 0",
+            },
+        )
+        self.assertEqual(
+            patches[150],
+            {
+                "index": 150,
+                "bank": 50,
+                "patch": 1,
+                "label": "A50-1",
+                "name": "Empty",
+            },
+        )
+        self.assertEqual(patches[299]["label"], "A99-3")
+        self.assertEqual(patches[299]["name"], "Patch 299")
+        self.assertEqual(
+            FakeTransport.instances[-1].requests,
+            [(int(Command.PRESET_INVENTORY), b"", 10.0)],
+        )
+        self.assertEqual(FakeTransport.instances[-1].sent, [])
+
+    def test_snapshot_requires_effect_catalog(self):
+        controller = DeviceController(
+            self.installation, transport_factory=FakeTransport
+        )
+
+        with self.assertRaisesRegex(
+            PlanValidationError, "snapshot requires an effect catalog"
+        ):
+            controller.snapshot(slot_count=2)
+
+    def test_snapshot_degrades_when_patch_inventory_times_out(self):
+        controller = DeviceController(
+            self.installation,
+            self.catalog,
+            transport_factory=InventoryTimeoutTransport,
+        )
+
+        snapshot = controller.snapshot(slot_count=2)
+
+        self.assertEqual(snapshot["preset_name"], "Fixture")
+        self.assertEqual(snapshot["edit_buffer_name"], "Fixture")
+        self.assertEqual(snapshot["preset_name_source"], "edit_buffer_unverified")
+        self.assertNotIn("patch_name", snapshot)
+        self.assertEqual(
+            snapshot["patch_name_read_error"]["error"], "DeviceTimeoutError"
+        )
+
+    def test_snapshot_rejects_out_of_range_patch_index(self):
+        controller = DeviceController(
+            self.installation,
+            self.catalog,
+            transport_factory=OutOfRangePatchTransport,
+        )
+
+        snapshot = controller.snapshot(slot_count=2)
+
+        self.assertEqual(snapshot["preset_name"], "Fixture")
+        self.assertEqual(snapshot["edit_buffer_name"], "Fixture")
+        self.assertEqual(snapshot["preset_name_source"], "edit_buffer_unverified")
+        self.assertFalse(snapshot["patch_location_verified"])
+        self.assertNotIn("patch_index", snapshot)
+        self.assertNotIn("patch_label", snapshot)
+        self.assertNotIn("patch_name", snapshot)
+        self.assertEqual(
+            snapshot["patch_location_read_error"]["error"], "PlanValidationError"
+        )
+        self.assertNotIn(
+            int(Command.PRESET_INVENTORY),
+            [address for address, _, _ in FakeTransport.instances[-1].requests],
+        )
 
     def test_snapshot_keeps_preset_when_patch_location_is_unknown(self):
         controller = DeviceController(
@@ -365,6 +507,9 @@ class ControllerTests(unittest.TestCase):
         )
         snapshot = controller.snapshot(slot_count=2)
         self.assertEqual(snapshot["preset_name"], "Fixture")
+        self.assertEqual(snapshot["edit_buffer_name"], "Fixture")
+        self.assertEqual(snapshot["preset_name_source"], "edit_buffer_unverified")
+        self.assertNotIn("patch_name", snapshot)
         self.assertFalse(snapshot["patch_location_verified"])
         self.assertNotIn("patch_index", snapshot)
         self.assertEqual(
@@ -372,6 +517,10 @@ class ControllerTests(unittest.TestCase):
             "PatchLocationUnknownError",
         )
         self.assertIn("0xffff", snapshot["patch_location_read_error"]["message"])
+        self.assertNotIn(
+            int(Command.PRESET_INVENTORY),
+            [address for address, _, _ in FakeTransport.instances[-1].requests],
+        )
 
     def test_apply_requires_manual_confirmation_when_patch_index_is_unknown(self):
         plan = TonePlan.from_dict(
@@ -580,9 +729,13 @@ class ControllerTests(unittest.TestCase):
             result["current_patch"]["verification"],
             "auto_selected_and_device_verified",
         )
+        sent = FakeTransport.instances[-1].sent
         self.assertIn(
-            (int(Command.PRESET_CHANGE), pack_int(150, 4), int(MessageFlag.SEND)),
-            FakeTransport.instances[-1].sent,
+            (int(Command.PRESET_INDEX), pack_int(150, 4), int(MessageFlag.SEND)),
+            sent,
+        )
+        self.assertFalse(
+            any(address == 0x03000003 for address, _, _ in sent)
         )
 
 

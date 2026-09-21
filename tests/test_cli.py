@@ -2,14 +2,41 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from ampero_control.cli import _build_apply_response, build_parser
+from ampero_control.cli import _build_apply_response, _device, build_parser
 from ampero_control.plan import TonePlan
 
 
 class CliTests(unittest.TestCase):
     def test_public_cli_uses_project_name(self):
         self.assertEqual(build_parser().prog, "ampero-tone-agent")
+
+    def test_device_patches_command_parses(self):
+        args = build_parser().parse_args(["device", "patches"])
+
+        self.assertEqual(args.device_command, "patches")
+
+    def test_device_patches_emits_controller_result(self):
+        args = build_parser().parse_args(["device", "patches"])
+        expected = [{"index": 0, "label": "A00-1", "name": "Clean"}]
+        installation = object()
+
+        with (
+            patch("ampero_control.cli.EffectCatalog.from_installation") as catalog,
+            patch("ampero_control.cli.DeviceController") as controller,
+            patch("ampero_control.cli._emit") as emit,
+        ):
+            controller.return_value.patches.return_value = expected
+
+            result = _device(args, installation)
+
+        self.assertEqual(result, 0)
+        catalog.assert_not_called()
+        controller.assert_called_once_with(installation)
+        emit.assert_called_once_with(
+            {"ok": True, "patches": expected}, args.json_output
+        )
 
     def test_apply_response_includes_journal_bound_save_preview(self):
         plan = TonePlan.from_dict(

@@ -5,8 +5,10 @@ import unittest
 from pathlib import Path
 
 from ampero_control.catalog import EffectCatalog
+from ampero_control.errors import PresetFormatError
 from ampero_control.preset import (
     parse_current_preset,
+    parse_patch_names,
     parse_routing_template_response,
 )
 
@@ -15,6 +17,22 @@ from test_catalog import CATALOG_FIXTURE
 
 
 class PresetParserTests(unittest.TestCase):
+    def test_parses_patch_names(self):
+        names = ["Empty", *(f"Patch {index}" for index in range(1, 300))]
+        index_table = struct.pack("<300H", *range(300))
+        name_table = b"".join(name.encode().ljust(17, b"\x00") for name in names)
+
+        parsed = parse_patch_names(index_table + name_table)
+
+        self.assertEqual(len(parsed), 300)
+        self.assertEqual(parsed[0], "Empty")
+        self.assertEqual(parsed[149], "Patch 149")
+        self.assertEqual(parsed[299], "Patch 299")
+
+    def test_rejects_short_patch_inventory(self):
+        with self.assertRaises(PresetFormatError):
+            parse_patch_names(bytes(5699))
+
     def test_parses_effect_chain_and_scene_parameters(self):
         with tempfile.TemporaryDirectory() as directory:
             catalog_path = Path(directory) / "v1.0.0_alg_data.json"

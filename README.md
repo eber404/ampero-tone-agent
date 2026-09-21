@@ -53,6 +53,7 @@ Codex interprets the goal, researches the tone background of a song or artist, q
 - Enumerates Ampero II Stomp input and output ports.
 - Reads the current Scene.
 - Reads the complete current preset, including name, Scene, slot order, enabled state, models, and parameters.
+- Lists all 300 patch inventory entries with index, bank, patch, label, and name without loading a patch.
 - Reads the current routing template and identifies `Parallel`, `Split->Mix`, `A/B->Y`, `Y->A/B`, and `Serial`.
 - Reads and verifies `Axx-y` locations. For example, `A50-1` maps to linear index `150`.
 
@@ -94,6 +95,7 @@ Current release: **0.2.0 (Alpha)**
 | Algorithm catalog | Read dynamically from the local editor; tested with `v1.0.8` and `v1.0.9` |
 | macOS native library | Universal arm64/x86_64 library and required exports verified locally |
 | Read-only snapshots | Verified on real hardware |
+| Read-only patch inventory | Implemented from shared Ampero II protocol evidence; Ampero II Stomp confirmation pending |
 | Routing reads and Serial switching | Verified on real hardware |
 | Model and parameter writes | Verified on real hardware |
 | Per-command immediate readbacks | Verified on real hardware |
@@ -334,6 +336,24 @@ $python = ".\.venv\Scripts\python.exe"
 & $python .\skills\ampero-tone\scripts\ampero.py --json device snapshot
 & $python .\skills\ampero-tone\scripts\ampero.py --json device snapshot --include-parameters
 ```
+
+The snapshot's `edit_buffer_name` comes from the live editing buffer.
+`patch_name` is the selected persisted-slot name from inventory, and `preset_name`
+uses that inventory name when available. `edit_buffer_name_matches_patch` compares
+names only; it does not prove that their preset contents match.
+
+### Patch inventory
+
+```powershell
+& $python .\skills\ampero-tone\scripts\ampero.py --json device patches
+```
+
+This read-only command returns all 300 `{index, bank, patch, label, name}` entries
+in one inventory read. Use it to match names visible on the hardware display or to
+list destination candidates without selecting or loading patches. The inventory
+carries no occupancy flag; names like "Empty" are string values only and do not
+prove a slot is empty. Require hardware display confirmation for any emptiness
+determination. Listing or choosing a destination does not approve a write.
 
 ### Read-only routing
 

@@ -16,6 +16,25 @@ DEFAULT_EFFECT_CHAIN_COUNT = 2
 DEFAULT_INPUT_SOURCE_COUNT = 7
 DEFAULT_INPUT_SOURCE_PARAMETER_COUNT = 4
 DEFAULT_NODE_PARAMETER_COUNT = 10
+PATCH_COUNT = 300
+PATCH_INDEX_SIZE = 2
+PATCH_NAME_SIZE = 17
+PATCH_INDEX_TABLE_SIZE = PATCH_COUNT * PATCH_INDEX_SIZE
+PATCH_INVENTORY_SIZE = PATCH_INDEX_TABLE_SIZE + PATCH_COUNT * PATCH_NAME_SIZE
+
+
+def parse_patch_names(data: bytes) -> tuple[str, ...]:
+    if len(data) < PATCH_INVENTORY_SIZE:
+        raise PresetFormatError(
+            f"patch inventory is {len(data)} bytes; "
+            f"expected at least {PATCH_INVENTORY_SIZE}"
+        )
+    return tuple(
+        _text(data[offset : offset + PATCH_NAME_SIZE])
+        for offset in range(
+            PATCH_INDEX_TABLE_SIZE, PATCH_INVENTORY_SIZE, PATCH_NAME_SIZE
+        )
+    )
 
 
 def parse_current_preset(

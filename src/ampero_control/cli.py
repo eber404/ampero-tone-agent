@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     device = subparsers.add_parser("device", help="device operations")
     device_subparsers = device.add_subparsers(dest="device_command", required=True)
     device_subparsers.add_parser("scan", help="enumerate matching MIDI ports")
+    device_subparsers.add_parser("patches", help="read all patch names and locations")
     snapshot = device_subparsers.add_parser(
         "snapshot", help="read current slot models and optionally their parameters"
     )
@@ -142,6 +143,11 @@ def _device(args, installation) -> int:
         with NativeTransport(installation) as transport:
             scan = transport.scan()
         _emit({"ok": True, "scan": scan}, args.json_output)
+        return 0
+    if args.device_command == "patches":
+        controller = DeviceController(installation)
+        patches = controller.patches()
+        _emit({"ok": True, "patches": patches}, args.json_output)
         return 0
     if args.device_command == "snapshot":
         if not 1 <= args.slots <= 12:

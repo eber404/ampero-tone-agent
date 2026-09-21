@@ -34,6 +34,17 @@ Windows or `python3` on macOS.
    When only routing state is needed, or a full preset snapshot times out, use the bounded read-only routing query:
 
    `python scripts/ampero.py --json device routing --timeout 5`
+
+   When the user asks to find or list destination slots, read the complete inventory once:
+
+   `python scripts/ampero.py --json device patches`
+
+   Use the returned labels and names to match names visible on the hardware display
+   or to identify candidate destinations. The inventory carries no occupancy flag;
+   names like "Empty" are string values only and do not prove a slot is empty.
+   Require hardware display confirmation for any emptiness determination. Do not
+   select or load patches one by one. Inventory listing and destination choice are
+   read-only context, not approval for any write.
 5. Research the requested tone, then translate it into effect choices and conservative parameter changes. Read `references/tone-language.md` when interpreting subjective tone words. For song-, artist-, album-, era-, or recording-specific requests, also read and follow `references/tone-research.md`; browse the web unless the user explicitly requests an offline answer.
 6. Query the installed catalog instead of inventing model or parameter names:
 

@@ -34,7 +34,12 @@ from .protocol import (
     pack_int,
     unpack_int,
 )
-from .preset import parse_current_preset, parse_routing_template_response
+from .preset import (
+    PATCH_COUNT,
+    parse_current_preset,
+    parse_patch_names,
+    parse_routing_template_response,
+)
 from .safety import SafetyReport, validate_actions
 
 
@@ -97,7 +102,7 @@ class DeviceController:
     def __init__(
         self,
         installation: EditorInstallation,
-        catalog: EffectCatalog,
+        catalog: Optional[EffectCatalog] = None,
         transport_factory=DartBridgeTransport,
     ):
         self.installation = installation
@@ -113,6 +118,24 @@ class DeviceController:
             transport.connect()
             return self._read_routing_template(transport, timeout=timeout)
 
+    def patches(self, *, timeout: float = 10.0) -> list[dict]:
+        with self._transport_factory(self.installation) as transport:
+            transport.connect()
+            names = self._read_patch_names(transport, timeout=timeout)
+        patches = []
+        for index, name in enumerate(names):
+            location = patch_location_from_index(index)
+            patches.append(
+                {
+                    "index": location.index,
+                    "bank": location.bank,
+                    "patch": location.patch,
+                    "label": location.label,
+                    "name": name,
+                }
+            )
+        return patches
+
     def snapshot(
         self,
         *,
@@ -120,10 +143,13 @@ class DeviceController:
         include_parameters: bool = False,
         timeout: float = 1.5,
     ) -> dict:
+        catalog = self._require_catalog("snapshot")
         with self._transport_factory(self.installation) as transport:
             transport.connect()
             patch_index = None
             patch_location_read_error = None
+            patch_names = None
+            patch_name_read_error = None
             try:
                 patch_index = self._read_patch_index(transport, timeout=timeout)
             except AmperoError as error:
@@ -131,6 +157,15 @@ class DeviceController:
                     "error": type(error).__name__,
                     "message": str(error),
                 }
+            if patch_index is not None:
+                try:
+                    patch_names = self._read_patch_names(transport, timeout=timeout)
+                except AmperoError as error:
+                    patch_names = None
+                    patch_name_read_error = {
+                        "error": type(error).__name__,
+                        "message": str(error),
+                    }
             scene_response = transport.request(
                 int(Command.CURRENT_SCENE), timeout=timeout
             )
@@ -144,12 +179,14 @@ class DeviceController:
             )
         snapshot = parse_current_preset(
             preset_response.data,
-            self.catalog,
+            catalog,
             current_scene=current_scene,
             include_parameters=include_parameters,
         )
         snapshot["slots"] = snapshot["slots"][:slot_count]
         snapshot["slot_count"] = len(snapshot["slots"])
+        snapshot["edit_buffer_name"] = snapshot["preset_name"]
+        snapshot["preset_name_source"] = "edit_buffer_unverified"
         snapshot["patch_location_verified"] = patch_index is not None
         if patch_index is None:
             snapshot["patch_location_read_error"] = patch_location_read_error
@@ -159,7 +196,22 @@ class DeviceController:
             snapshot["patch_bank"] = patch_location.bank
             snapshot["patch_number"] = patch_location.patch
             snapshot["patch_label"] = patch_location.label
+            if patch_names is not None:
+                patch_name = patch_names[patch_index]
+                snapshot["patch_name"] = patch_name
+                snapshot["preset_name"] = patch_name
+                snapshot["preset_name_source"] = "patch_inventory"
+                snapshot["edit_buffer_name_matches_patch"] = (
+                    snapshot["edit_buffer_name"] == patch_name
+                )
+            elif patch_name_read_error is not None:
+                snapshot["patch_name_read_error"] = patch_name_read_error
         return snapshot
+
+    def _require_catalog(self, operation: str) -> EffectCatalog:
+        if self.catalog is None:
+            raise PlanValidationError(f"{operation} requires an effect catalog")
+        return self.catalog
 
     def apply(
         self,
@@ -436,7 +488,7 @@ class DeviceController:
         payload = pack_int(target_patch.index, 4)
         if len(payload) != 4:
             raise PlanValidationError("patch selection payload must contain four bytes")
-        transport.send(int(Command.PRESET_CHANGE), payload, MessageFlag.SEND)
+        transport.send(int(Command.PRESET_INDEX), payload, MessageFlag.SEND)
         time.sleep(0.25)
         transport.request(int(Command.CURRENT_PRESET), timeout=10.0)
         selected_index = self._read_patch_index(transport, timeout=3.0)
@@ -556,6 +608,13 @@ class DeviceController:
         response = transport.request(int(Command.ROUTING_TEMPLATE), timeout=timeout)
         return parse_routing_template_response(response.data)
 
+    @staticmethod
+    def _read_patch_names(transport, timeout: float) -> tuple[str, ...]:
+        response = transport.request(
+            int(Command.PRESET_INVENTORY), b"", timeout=timeout
+        )
+        return parse_patch_names(response.data)
+
     def _read_patch_index(
         self, transport: DartBridgeTransport, timeout: float = 2.0
     ) -> int:
@@ -575,6 +634,11 @@ class DeviceController:
         if patch_index == 0xFFFF:
             raise PatchLocationUnknownError(
                 "device returned 0xffff for current patch index; patch location is unknown"
+            )
+        if patch_index >= PATCH_COUNT:
+            raise PlanValidationError(
+                f"device returned out-of-range current patch index {patch_index}; "
+                f"expected 0-{PATCH_COUNT - 1}"
             )
         return patch_index
 
